@@ -763,8 +763,8 @@ fn WorkoutActive(
                         let calories = (hours * bodyweight * met).round() as i64;
                         
                         let health_url = format!(
-                            "shortcuts://run-shortcut?name=Oxidize&input=text&text={}",
-                            duration_mins
+                            "shortcuts://run-shortcut?name=Oxidize&input=text&text={}-{}",
+                            duration_mins, calories
                         );
                         view! {
                             <div class="finish-screen">
