@@ -332,7 +332,11 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
             
             <div class="logged-in-info">
                 "inloggad:"<br/>
-                {user_email}
+                {user_email.clone()}<br/>
+                <button class="logout-link" on:click=move |_| {
+                    supabase::sign_out();
+                    set_view.set(AppView::Login);
+                }>"logga ut"</button>
             </div>
             
             // Confirmation dialog
