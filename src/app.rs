@@ -136,6 +136,7 @@ fn WorkoutActive(data: WorkoutData, set_view: WriteSignal<AppView>) -> impl Into
     let is_pass_a = routine_name.contains("A");
     
     // State
+    let total_exercises = data.exercises.len();
     let (exercises, set_exercises) = create_signal(data.exercises);
     let (current_idx, set_current_idx) = create_signal(0usize);
     let (start_time, _) = create_signal(js_sys::Date::now() as i64 / 1000);
@@ -144,6 +145,14 @@ fn WorkoutActive(data: WorkoutData, set_view: WriteSignal<AppView>) -> impl Into
     let (rest_elapsed, set_rest_elapsed) = create_signal(0i64);
     let (is_resting, set_is_resting) = create_signal(false);
     let (is_finished, set_is_finished) = create_signal(false);
+    let (show_overview, set_show_overview) = create_signal(false);
+    
+    // Jump to specific exercise
+    let jump_to_exercise = move |idx: usize| {
+        set_current_idx.set(idx);
+        set_is_resting.set(false);
+        set_show_overview.set(false);
+    };
     
     // Timer
     create_effect(move |_| {
@@ -255,11 +264,100 @@ fn WorkoutActive(data: WorkoutData, set_view: WriteSignal<AppView>) -> impl Into
 
     view! {
         <div class="workout">
-            // Header
+            // Header with progress dots
             <div class="workout-header">
                 <div class=format!("workout-title {}", accent_class)>{&routine.name}</div>
+                
+                // Progress dots - clickable to open overview
+                <div class="progress-dots" on:click=move |_| set_show_overview.set(true)>
+                    {move || {
+                        let curr = current_idx.get();
+                        let exs = exercises.get();
+                        (0..total_exercises).map(|i| {
+                            let is_done = exs.get(i).map(|e| {
+                                e.sets_completed.len() >= e.exercise.sets as usize
+                            }).unwrap_or(false);
+                            let is_current = i == curr;
+                            let is_started = exs.get(i).map(|e| !e.sets_completed.is_empty()).unwrap_or(false);
+                            
+                            let dot_class = if is_done {
+                                "progress-dot done"
+                            } else if is_current {
+                                "progress-dot current"
+                            } else if is_started {
+                                "progress-dot started"
+                            } else {
+                                "progress-dot"
+                            };
+                            
+                            view! { <div class=dot_class></div> }
+                        }).collect_view()
+                    }}
+                </div>
+                
                 <div class="workout-timer">{move || format_time(elapsed.get())}</div>
             </div>
+            
+            // Overview modal
+            {move || {
+                if show_overview.get() {
+                    let exs = exercises.get();
+                    let curr = current_idx.get();
+                    
+                    view! {
+                        <div class="overview-modal-backdrop" on:click=move |_| set_show_overview.set(false)>
+                            <div class="overview-modal" on:click=|e| e.stop_propagation()>
+                                <div class="overview-header">
+                                    <span class="overview-title">"Pass-översikt"</span>
+                                    <button class="overview-close" on:click=move |_| set_show_overview.set(false)>"✕"</button>
+                                </div>
+                                <div class="overview-list">
+                                    {exs.iter().enumerate().map(|(i, ex)| {
+                                        let name = ex.exercise.name.clone();
+                                        let sets_done = ex.sets_completed.len();
+                                        let sets_total = ex.exercise.sets as usize;
+                                        let is_done = sets_done >= sets_total;
+                                        let is_current = i == curr;
+                                        let is_superset = ex.exercise.is_superset;
+                                        
+                                        let item_class = if is_done {
+                                            "overview-item done"
+                                        } else if is_current {
+                                            "overview-item current"
+                                        } else {
+                                            "overview-item"
+                                        };
+                                        
+                                        let status_icon = if is_done {
+                                            "✓"
+                                        } else if is_current {
+                                            "►"
+                                        } else {
+                                            ""
+                                        };
+                                        
+                                        view! {
+                                            <div 
+                                                class=item_class
+                                                on:click=move |_| jump_to_exercise(i)
+                                            >
+                                                <span class="overview-icon">{status_icon}</span>
+                                                <span class="overview-name">
+                                                    {if is_superset { "↔ " } else { "" }}
+                                                    {name}
+                                                </span>
+                                                <span class="overview-sets">{format!("{}/{}", sets_done, sets_total)}</span>
+                                            </div>
+                                        }
+                                    }).collect_view()}
+                                </div>
+                            </div>
+                        </div>
+                    }.into_view()
+                } else {
+                    view! { <div></div> }.into_view()
+                }
+            }}
             
             // Main content
             <div class="workout-main">

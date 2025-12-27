@@ -213,6 +213,146 @@ button {
     font-variant-numeric: tabular-nums;
 }
 
+/* Progress dots */
+.progress-dots {
+    display: flex;
+    gap: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.progress-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--fg-muted);
+    transition: all 0.2s;
+}
+
+.progress-dot.done {
+    background: var(--accent-a);
+}
+
+.progress-dot.current {
+    background: var(--accent-a);
+    box-shadow: 0 0 8px var(--accent-a);
+    animation: pulse 1.5s infinite;
+}
+
+.progress-dot.started {
+    background: var(--accent-a);
+    opacity: 0.5;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.8; }
+}
+
+/* Overview modal */
+.overview-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 1rem;
+}
+
+.overview-modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 400px;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.overview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.overview-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+}
+
+.overview-close {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+    color: var(--fg-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.overview-list {
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+.overview-item {
+    display: flex;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    gap: 0.75rem;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.overview-item:active {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.overview-item.current {
+    background: rgba(0, 255, 136, 0.1);
+    border: 1px solid var(--accent-a);
+}
+
+.overview-item.done {
+    opacity: 0.6;
+}
+
+.overview-icon {
+    width: 24px;
+    font-size: 1rem;
+    color: var(--accent-a);
+    text-align: center;
+}
+
+.overview-name {
+    flex: 1;
+    font-size: 1rem;
+}
+
+.overview-item.done .overview-name {
+    text-decoration: line-through;
+    color: var(--fg-muted);
+}
+
+.overview-sets {
+    font-size: 0.85rem;
+    color: var(--fg-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
 .workout-main {
     flex: 1;
     display: flex;
