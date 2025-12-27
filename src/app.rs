@@ -733,7 +733,7 @@ fn WorkoutActive(
                 {move || {
                     if is_finished.get() {
                         // Finished view
-                        let duration_mins = elapsed.get() / 60;
+                        let duration_mins = std::cmp::max(1, (elapsed.get() + 30) / 60); // Round up, minimum 1 min
                         let health_url = format!(
                             "shortcuts://run-shortcut?name=Oxidize&input=text&text={}",
                             duration_mins
