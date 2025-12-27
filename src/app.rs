@@ -330,6 +330,11 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
                 "Statistik →"
             </button>
             
+            <div class="logged-in-info">
+                "inloggad:"<br/>
+                {user_email}
+            </div>
+            
             // Confirmation dialog
             {move || show_confirm.get().then(|| view! {
                 <div class="modal-overlay">

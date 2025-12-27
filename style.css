@@ -168,6 +168,16 @@ button {
     color: #ff4444;
 }
 
+.logged-in-info {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+    line-height: 1.6;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    DASHBOARD
    ═══════════════════════════════════════════════════════════════ */
