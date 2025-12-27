@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oxidize-v1';
+const CACHE_NAME = 'oxidize-v17';
 
 // Install: skip waiting to activate immediately
 self.addEventListener('install', event => {
@@ -63,7 +63,7 @@ self.addEventListener('fetch', event => {
         }).catch(() => {
             // Offline fallback - serve index.html for navigation requests
             if (event.request.mode === 'navigate') {
-                return caches.match('/index.html');
+                return caches.match('./index.html') || caches.match('index.html');
             }
             return new Response('Offline', { status: 503 });
         })

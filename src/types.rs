@@ -113,3 +113,13 @@ pub enum AppView {
     Workout(String),
     Stats,
 }
+
+/// Paused workout state - saved when leaving mid-workout
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PausedWorkout {
+    pub routine_name: String,
+    pub exercises: Vec<ExerciseWorkoutState>,
+    pub current_exercise_idx: usize,
+    pub start_timestamp: i64,
+    pub elapsed_secs: i64,
+}

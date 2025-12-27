@@ -1,6 +1,6 @@
 use leptos::*;
 use crate::types::{
-    AppView, WorkoutData, SetRecord, ExerciseRecord, ExerciseStats,
+    AppView, WorkoutData, SetRecord, ExerciseRecord, ExerciseStats, ExerciseWorkoutState,
 };
 use crate::storage;
 use crate::stats::{self, MuscleGroup, ProgressStatus, BIG_FOUR};
@@ -63,6 +63,25 @@ fn Dashboard(set_view: WriteSignal<AppView>) -> impl IntoView {
     let db = storage::load_data();
     let total = db.get_total_stats();
     let recent = db.get_recent_sessions(3);
+    let paused = storage::load_paused_workout();
+    
+    // State for confirmation dialog
+    let (show_confirm, set_show_confirm) = create_signal(false);
+    let (pending_routine, set_pending_routine) = create_signal(String::new());
+    
+    let start_workout = move |routine: &str| {
+        if storage::load_paused_workout().is_some() {
+            set_pending_routine.set(routine.to_string());
+            set_show_confirm.set(true);
+        } else {
+            set_view.set(AppView::Workout(routine.to_string()));
+        }
+    };
+    
+    let confirm_start = move |_| {
+        storage::clear_paused_workout();
+        set_view.set(AppView::Workout(pending_routine.get()));
+    };
 
     view! {
         <div class="dashboard">
@@ -79,9 +98,31 @@ fn Dashboard(set_view: WriteSignal<AppView>) -> impl IntoView {
                 </div>
             </div>
             
+            // Paused workout banner
+            {paused.map(|p| {
+                let routine_name = p.routine_name.clone();
+                let elapsed = format_time(p.elapsed_secs);
+                let exercises_done = p.exercises.iter().filter(|e| !e.sets_completed.is_empty()).count();
+                let total_ex = p.exercises.len();
+                view! {
+                    <div class="paused-workout-banner">
+                        <div class="paused-info">
+                            <span class="paused-label"><span class="pause-icon"></span>" Pågående pass"</span>
+                            <span class="paused-routine">{&routine_name}</span>
+                            <span class="paused-progress">{exercises_done}"/" {total_ex}" övningar · "{elapsed}</span>
+                        </div>
+                        <button class="resume-btn" on:click=move |_| set_view.set(AppView::Workout(
+                            if routine_name.contains("A") { "A".to_string() } else { "B".to_string() }
+                        ))>
+                            "Fortsätt →"
+                        </button>
+                    </div>
+                }
+            })}
+            
             <button 
                 class="start-btn pass-a"
-                on:click=move |_| set_view.set(AppView::Workout("A".to_string()))
+                on:click=move |_| start_workout("A")
             >
                 <span class="start-btn-label">"Pass A"</span>
                 <span class="start-btn-focus">"Ben · Press · Triceps"</span>
@@ -89,7 +130,7 @@ fn Dashboard(set_view: WriteSignal<AppView>) -> impl IntoView {
             
             <button 
                 class="start-btn pass-b"
-                on:click=move |_| set_view.set(AppView::Workout("B".to_string()))
+                on:click=move |_| start_workout("B")
             >
                 <span class="start-btn-label">"Pass B"</span>
                 <span class="start-btn-focus">"Rygg · Axlar · Biceps"</span>
@@ -111,41 +152,91 @@ fn Dashboard(set_view: WriteSignal<AppView>) -> impl IntoView {
                 </div>
             })}
             
-            <div class="stats-link" on:click=move |_| set_view.set(AppView::Stats)>
+            <button class="stats-link" on:click=move |_| set_view.set(AppView::Stats)>
                 "Statistik →"
-            </div>
+            </button>
+            
+            // Confirmation dialog
+            {move || show_confirm.get().then(|| view! {
+                <div class="modal-overlay">
+                    <div class="confirm-dialog">
+                        <div class="confirm-title">"Avbryta pågående pass?"</div>
+                        <div class="confirm-text">"Du har ett pågående pass. Vill du radera det och starta ett nytt?"</div>
+                        <div class="confirm-buttons">
+                            <button class="confirm-cancel" on:click=move |_| set_show_confirm.set(false)>
+                                "Avbryt"
+                            </button>
+                            <button class="confirm-ok" on:click=confirm_start>
+                                "Ja, starta nytt"
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            })}
         </div>
     }
 }
 
 #[component]
 fn Workout(routine: String, set_view: WriteSignal<AppView>) -> impl IntoView {
+    // Check for paused workout first
+    if let Some(paused) = storage::load_paused_workout() {
+        let expected_routine = if routine == "A" { "Pass A" } else { "Pass B" };
+        if paused.routine_name == expected_routine {
+            // Resume paused workout
+            let data = storage::get_workout(&routine);
+            if let Some(mut d) = data {
+                d.exercises = paused.exercises;
+                return view! { 
+                    <WorkoutActive 
+                        data=d 
+                        set_view=set_view 
+                        resumed_from=paused.current_exercise_idx
+                        start_elapsed=paused.elapsed_secs
+                    /> 
+                }.into_view();
+            }
+        }
+    }
+    
+    // Clear any paused workout since we're starting fresh
+    storage::clear_paused_workout();
+    
     let data = storage::get_workout(&routine);
     
     match data {
-        Some(d) => view! { <WorkoutActive data=d set_view=set_view /> }.into_view(),
+        Some(d) => view! { 
+            <WorkoutActive data=d set_view=set_view /> 
+        }.into_view(),
         None => view! { <div class="loading">"Kunde inte ladda pass"</div> }.into_view(),
     }
 }
 
 #[component]
-fn WorkoutActive(data: WorkoutData, set_view: WriteSignal<AppView>) -> impl IntoView {
+fn WorkoutActive(
+    data: WorkoutData, 
+    set_view: WriteSignal<AppView>,
+    #[prop(default = 0)] resumed_from: usize,
+    #[prop(default = 0)] start_elapsed: i64,
+) -> impl IntoView {
     let routine = data.routine.clone();
     let routine_name = routine.name.clone();
     let routine_name_save = routine_name.clone();
+    let routine_name_pause = routine_name.clone();
     let is_pass_a = routine_name.contains("A");
     
     // State
     let total_exercises = data.exercises.len();
     let (exercises, set_exercises) = create_signal(data.exercises);
-    let (current_idx, set_current_idx) = create_signal(0usize);
-    let (start_time, _) = create_signal(js_sys::Date::now() as i64 / 1000);
-    let (elapsed, set_elapsed) = create_signal(0i64);
+    let (current_idx, set_current_idx) = create_signal(resumed_from);
+    let (start_time, _) = create_signal(js_sys::Date::now() as i64 / 1000 - start_elapsed);
+    let (elapsed, set_elapsed) = create_signal(start_elapsed);
     let (last_set_time, set_last_set_time) = create_signal(0i64);
     let (rest_elapsed, set_rest_elapsed) = create_signal(0i64);
     let (is_resting, set_is_resting) = create_signal(false);
     let (is_finished, set_is_finished) = create_signal(false);
     let (show_overview, set_show_overview) = create_signal(false);
+    let (show_cancel_confirm, set_show_cancel_confirm) = create_signal(false);
     
     // Jump to specific exercise
     let jump_to_exercise = move |idx: usize| {
@@ -184,6 +275,16 @@ fn WorkoutActive(data: WorkoutData, set_view: WriteSignal<AppView>) -> impl Into
         current_exercise().map(|e| e.exercise.reps_target.clone()).unwrap_or_default()
     };
     
+    // Helper to find superset partner index
+    let find_partner_idx = move |exs: &[ExerciseWorkoutState], current_idx: usize| -> Option<usize> {
+        let current = &exs[current_idx];
+        if !current.exercise.is_superset {
+            return None;
+        }
+        let partner_name = current.exercise.superset_with.as_ref()?;
+        exs.iter().position(|e| &e.exercise.name == partner_name)
+    };
+    
     // Complete a set
     let complete_set = move |reps: u8| {
         let now = js_sys::Date::now() as i64 / 1000;
@@ -194,7 +295,8 @@ fn WorkoutActive(data: WorkoutData, set_view: WriteSignal<AppView>) -> impl Into
         let exs = exercises.get();
         let sets_done = exs[idx].sets_completed.len();
         let sets_target = exs[idx].exercise.sets as usize;
-        let is_last_exercise = idx + 1 >= exs.len();
+        let is_superset = exs[idx].exercise.is_superset;
+        let _is_last_exercise = idx + 1 >= exs.len();
         
         // Add the set
         set_exercises.update(|exs| {
@@ -212,17 +314,52 @@ fn WorkoutActive(data: WorkoutData, set_view: WriteSignal<AppView>) -> impl Into
         set_rest_elapsed.set(0);
         
         // Check if we just completed the LAST set of this exercise
-        if sets_done + 1 >= sets_target {
-            // Move to next exercise
-            if !is_last_exercise {
-                set_current_idx.set(idx + 1);
+        let just_finished_exercise = sets_done + 1 >= sets_target;
+        
+        if just_finished_exercise {
+            // This exercise is done
+            if is_superset {
+                // Check if partner is also done
+                if let Some(partner_idx) = find_partner_idx(&exs, idx) {
+                    let partner = &exs[partner_idx];
+                    let partner_done = partner.sets_completed.len() >= partner.exercise.sets as usize;
+                    if !partner_done {
+                        // Partner still has sets, go there
+                        set_current_idx.set(partner_idx);
+                        set_is_resting.set(true);
+                        return;
+                    }
+                }
+            }
+            // Move to next exercise (skip partner if it's right after us)
+            let mut next_idx = idx + 1;
+            while next_idx < exs.len() {
+                let next_ex = &exs[next_idx];
+                let next_done = next_ex.sets_completed.len() >= next_ex.exercise.sets as usize;
+                if !next_done {
+                    break;
+                }
+                next_idx += 1;
+            }
+            if next_idx < exs.len() {
+                set_current_idx.set(next_idx);
             } else {
                 // All exercises done!
                 set_is_finished.set(true);
                 return;
             }
+        } else if is_superset {
+            // Not done with this exercise yet - alternate to partner if they have sets remaining
+            if let Some(partner_idx) = find_partner_idx(&exs, idx) {
+                let partner = &exs[partner_idx];
+                let partner_done = partner.sets_completed.len() >= partner.exercise.sets as usize;
+                if !partner_done {
+                    // Partner has sets remaining, switch to them
+                    set_current_idx.set(partner_idx);
+                }
+            }
         }
-        // Show rest screen (whether staying on same exercise or moving to next)
+        // Show rest screen
         set_is_resting.set(true);
     };
     
@@ -269,7 +406,7 @@ fn WorkoutActive(data: WorkoutData, set_view: WriteSignal<AppView>) -> impl Into
                 <div class=format!("workout-title {}", accent_class)>{&routine.name}</div>
                 
                 // Progress dots - clickable to open overview
-                <div class="progress-dots" on:click=move |_| set_show_overview.set(true)>
+                <button class="progress-dots" on:click=move |_| set_show_overview.set(true)>
                     {move || {
                         let curr = current_idx.get();
                         let exs = exercises.get();
@@ -290,10 +427,10 @@ fn WorkoutActive(data: WorkoutData, set_view: WriteSignal<AppView>) -> impl Into
                                 "progress-dot"
                             };
                             
-                            view! { <div class=dot_class></div> }
+                            view! { <span class=dot_class></span> }
                         }).collect_view()
                     }}
-                </div>
+                </button>
                 
                 <div class="workout-timer">{move || format_time(elapsed.get())}</div>
             </div>
@@ -312,44 +449,93 @@ fn WorkoutActive(data: WorkoutData, set_view: WriteSignal<AppView>) -> impl Into
                                     <button class="overview-close" on:click=move |_| set_show_overview.set(false)>"✕"</button>
                                 </div>
                                 <div class="overview-list">
-                                    {exs.iter().enumerate().map(|(i, ex)| {
-                                        let name = ex.exercise.name.clone();
-                                        let sets_done = ex.sets_completed.len();
-                                        let sets_total = ex.exercise.sets as usize;
-                                        let is_done = sets_done >= sets_total;
-                                        let is_current = i == curr;
-                                        let is_superset = ex.exercise.is_superset;
-                                        
-                                        let item_class = if is_done {
-                                            "overview-item done"
-                                        } else if is_current {
-                                            "overview-item current"
-                                        } else {
-                                            "overview-item"
-                                        };
-                                        
-                                        let status_icon = if is_done {
-                                            "✓"
-                                        } else if is_current {
-                                            "►"
-                                        } else {
-                                            ""
-                                        };
-                                        
-                                        view! {
-                                            <div 
-                                                class=item_class
-                                                on:click=move |_| jump_to_exercise(i)
-                                            >
-                                                <span class="overview-icon">{status_icon}</span>
-                                                <span class="overview-name">
-                                                    {if is_superset { "↔ " } else { "" }}
-                                                    {name}
-                                                </span>
-                                                <span class="overview-sets">{format!("{}/{}", sets_done, sets_total)}</span>
-                                            </div>
+                                    {
+                                        // Group exercises, detecting superset pairs
+                                        let mut result: Vec<View> = Vec::new();
+                                        let mut i = 0;
+                                        while i < exs.len() {
+                                            let ex = &exs[i];
+                                            let is_superset = ex.exercise.is_superset;
+                                            
+                                            // Check if this starts a superset pair
+                                            let has_partner = is_superset && i + 1 < exs.len() && 
+                                                exs[i + 1].exercise.is_superset &&
+                                                exs[i + 1].exercise.superset_with.as_ref() == Some(&ex.exercise.name);
+                                            
+                                            if has_partner {
+                                                // Render both as a group
+                                                let ex1 = &exs[i];
+                                                let ex2 = &exs[i + 1];
+                                                let idx1 = i;
+                                                let idx2 = i + 1;
+                                                
+                                                let item1_class = if ex1.sets_completed.len() >= ex1.exercise.sets as usize { 
+                                                    "overview-item done" 
+                                                } else if idx1 == curr { 
+                                                    "overview-item current" 
+                                                } else { 
+                                                    "overview-item" 
+                                                };
+                                                let item2_class = if ex2.sets_completed.len() >= ex2.exercise.sets as usize { 
+                                                    "overview-item done" 
+                                                } else if idx2 == curr { 
+                                                    "overview-item current" 
+                                                } else { 
+                                                    "overview-item" 
+                                                };
+                                                
+                                                let icon1 = if ex1.sets_completed.len() >= ex1.exercise.sets as usize { "✓" } 
+                                                    else if idx1 == curr { "►" } else { "" };
+                                                let icon2 = if ex2.sets_completed.len() >= ex2.exercise.sets as usize { "✓" } 
+                                                    else if idx2 == curr { "►" } else { "" };
+                                                
+                                                let name1 = ex1.exercise.name.clone();
+                                                let name2 = ex2.exercise.name.clone();
+                                                let sets1 = format!("{}/{}", ex1.sets_completed.len(), ex1.exercise.sets);
+                                                let sets2 = format!("{}/{}", ex2.sets_completed.len(), ex2.exercise.sets);
+                                                
+                                                result.push(view! {
+                                                    <div class="superset-group">
+                                                        <button class=item1_class on:click=move |_| jump_to_exercise(idx1)>
+                                                            <span class="overview-icon">{icon1}</span>
+                                                            <span class="overview-name">{name1}</span>
+                                                            <span class="overview-sets">{sets1}</span>
+                                                        </button>
+                                                        <button class=item2_class on:click=move |_| jump_to_exercise(idx2)>
+                                                            <span class="overview-icon">{icon2}</span>
+                                                            <span class="overview-name">{name2}</span>
+                                                            <span class="overview-sets">{sets2}</span>
+                                                        </button>
+                                                    </div>
+                                                }.into_view());
+                                                i += 2;
+                                            } else {
+                                                // Regular exercise
+                                                let idx = i;
+                                                let item_class = if ex.sets_completed.len() >= ex.exercise.sets as usize { 
+                                                    "overview-item done" 
+                                                } else if idx == curr { 
+                                                    "overview-item current" 
+                                                } else { 
+                                                    "overview-item" 
+                                                };
+                                                let icon = if ex.sets_completed.len() >= ex.exercise.sets as usize { "✓" } 
+                                                    else if idx == curr { "►" } else { "" };
+                                                let name = ex.exercise.name.clone();
+                                                let sets = format!("{}/{}", ex.sets_completed.len(), ex.exercise.sets);
+                                                
+                                                result.push(view! {
+                                                    <button class=item_class on:click=move |_| jump_to_exercise(idx)>
+                                                        <span class="overview-icon">{icon}</span>
+                                                        <span class="overview-name">{name}</span>
+                                                        <span class="overview-sets">{sets}</span>
+                                                    </button>
+                                                }.into_view());
+                                                i += 1;
+                                            }
                                         }
-                                    }).collect_view()}
+                                        result.into_iter().collect_view()
+                                    }
                                 </div>
                             </div>
                         </div>
@@ -448,9 +634,13 @@ fn WorkoutActive(data: WorkoutData, set_view: WriteSignal<AppView>) -> impl Into
                                 <div class="rep-label">"Tryck antal reps:"</div>
                                 <div class="rep-buttons">
                                     {move || {
-                                        let (min, max) = current_exercise()
+                                        let ex = current_exercise();
+                                        let (min, max) = ex.as_ref()
                                             .map(|e| parse_target_range(&e.exercise.reps_target))
                                             .unwrap_or((5, 8));
+                                        let last_reps = ex.as_ref()
+                                            .and_then(|e| e.last_data.as_ref())
+                                            .map(|d| d.reps);
                                         
                                         // Center the 12-button grid around the target
                                         let center = (min + max) / 2;
@@ -458,8 +648,15 @@ fn WorkoutActive(data: WorkoutData, set_view: WriteSignal<AppView>) -> impl Into
                                         let end = start + 11; // 12 buttons total
                                         
                                         (start..=end).map(|r| {
+                                            let is_last = last_reps == Some(r);
                                             let is_target = r >= min && r <= max;
-                                            let btn_class = if is_target { "rep-button target" } else { "rep-button" };
+                                            let btn_class = if is_last { 
+                                                "rep-button last" 
+                                            } else if is_target { 
+                                                "rep-button target" 
+                                            } else { 
+                                                "rep-button" 
+                                            };
                                             view! {
                                                 <button 
                                                     class=btn_class
@@ -487,10 +684,47 @@ fn WorkoutActive(data: WorkoutData, set_view: WriteSignal<AppView>) -> impl Into
             
             // Footer
             <div class="workout-footer">
-                <button class="cancel-workout-btn" on:click=move |_| set_view.set(AppView::Dashboard)>
-                    "Avbryt pass"
+                <button class="back-btn" on:click=move |_| {
+                    // Save paused state
+                    let paused = crate::types::PausedWorkout {
+                        routine_name: routine_name_pause.clone(),
+                        exercises: exercises.get(),
+                        current_exercise_idx: current_idx.get(),
+                        start_timestamp: start_time.get(),
+                        elapsed_secs: elapsed.get(),
+                    };
+                    let _ = storage::save_paused_workout(&paused);
+                    set_view.set(AppView::Dashboard);
+                }>
+                    <span class="pause-icon"></span>" Pausa"
+                </button>
+                <button class="cancel-workout-btn" on:click=move |_| {
+                    set_show_cancel_confirm.set(true);
+                }>
+                    "Avsluta pass"
                 </button>
             </div>
+            
+            // Cancel confirmation modal
+            {move || show_cancel_confirm.get().then(|| view! {
+                <div class="modal-overlay">
+                    <div class="confirm-dialog">
+                        <div class="confirm-title">"Avsluta pass?"</div>
+                        <div class="confirm-text">"Är du säker? Passet sparas inte."</div>
+                        <div class="confirm-buttons">
+                            <button class="confirm-cancel" on:click=move |_| set_show_cancel_confirm.set(false)>
+                                "Nej, fortsätt"
+                            </button>
+                            <button class="confirm-ok" on:click=move |_| {
+                                storage::clear_paused_workout();
+                                set_view.set(AppView::Dashboard);
+                            }>
+                                "Ja, avsluta"
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            })}
         </div>
     }
 }
@@ -502,7 +736,13 @@ fn Stats(set_view: WriteSignal<AppView>) -> impl IntoView {
     let summary = stats::get_stats_summary(&db, initial_bodyweight);
     let power_history = stats::get_power_score_history(&db);
     let all_stats = db.get_all_exercise_stats();
-    let sessions = db.get_recent_sessions(10);
+    // Get sessions from last 61 days (2 months)
+    let now = chrono::Utc::now().timestamp();
+    let two_months_ago = now - (61 * 24 * 60 * 60);
+    let sessions: Vec<_> = db.sessions.iter()
+        .filter(|s| s.timestamp >= two_months_ago)
+        .cloned()
+        .collect();
     
     // Reactive bodyweight signal
     let (bodyweight, set_bodyweight) = create_signal(initial_bodyweight);
@@ -550,7 +790,7 @@ fn Stats(set_view: WriteSignal<AppView>) -> impl IntoView {
     view! {
         <div class="stats">
             <div class="stats-header">
-                <button class="back-btn" on:click=move |_| set_view.set(AppView::Dashboard)>
+                <button class="stats-back-btn" on:click=move |_| set_view.set(AppView::Dashboard)>
                     "←"
                 </button>
                 <div class="stats-title">"Statistik"</div>
@@ -636,7 +876,7 @@ fn Stats(set_view: WriteSignal<AppView>) -> impl IntoView {
                                 } else {
                                     let bw = bodyweight.get();
                                     view! {
-                                        <div class="bw-display" on:click=move |_| {
+                                        <button class="bw-display" on:click=move |_| {
                                             set_weight_input.set(format!("{:.1}", bodyweight.get()));
                                             set_editing_weight.set(true);
                                         }>
@@ -644,7 +884,7 @@ fn Stats(set_view: WriteSignal<AppView>) -> impl IntoView {
                                             <span class="bw-value">{format!("{:.1}", bw)}</span>
                                             <span class="bw-kg">" kg"</span>
                                             <span class="bw-edit-icon">" ✎"</span>
-                                        </div>
+                                        </button>
                                     }.into_view()
                                 }
                             }}
@@ -701,25 +941,25 @@ fn Stats(set_view: WriteSignal<AppView>) -> impl IntoView {
                         <div class="stat-card-title">"Senaste passet: Progression"</div>
                         <div class="overload-grid">
                             {overload_statuses_clone.iter().map(|(name, status)| {
-                                let (icon, class) = match status {
-                                    ProgressStatus::Improved => ("🔥", "improved"),
-                                    ProgressStatus::Maintained => ("➡️", "maintained"),
-                                    ProgressStatus::Regressed => ("⬇️", "regressed"),
-                                    ProgressStatus::FirstTime => ("🆕", "first"),
+                                let class = match status {
+                                    ProgressStatus::Improved => "improved",
+                                    ProgressStatus::Maintained => "maintained",
+                                    ProgressStatus::Regressed => "regressed",
+                                    ProgressStatus::FirstTime => "first",
                                 };
                                 let name = name.clone();
                                 view! {
                                     <div class=format!("overload-item {}", class)>
-                                        <span class="overload-icon">{icon}</span>
+                                        <span class="overload-icon"></span>
                                         <span class="overload-name">{name}</span>
                                     </div>
                                 }
                             }).collect_view()}
                         </div>
                         <div class="overload-legend">
-                            <span>"🔥 Ökning"</span>
-                            <span>"➡️ Stabil"</span>
-                            <span>"⬇️ Nedgång"</span>
+                            <span class="legend-item improved"><span class="legend-icon"></span>" Ökning"</span>
+                            <span class="legend-item maintained"><span class="legend-icon"></span>" Stabil"</span>
+                            <span class="legend-item regressed"><span class="legend-icon"></span>" Nedgång"</span>
                         </div>
                     </div>
                 })}
@@ -787,9 +1027,11 @@ fn Stats(set_view: WriteSignal<AppView>) -> impl IntoView {
                     view! {
                         <div class="exercise-stats-section">
                             <div class="section-title">"Övningar"</div>
-                            {all_stats.into_iter().map(|s| {
-                                view! { <ExerciseStatsCard stats=s /> }
-                            }).collect_view()}
+                            <div class="exercise-stats-grid">
+                                {all_stats.into_iter().map(|s| {
+                                    view! { <ExerciseStatsCard stats=s /> }
+                                }).collect_view()}
+                            </div>
                         </div>
                     }.into_view()
                 }}

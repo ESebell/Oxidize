@@ -71,7 +71,31 @@ button {
 .quick-stats {
     display: flex;
     gap: 3rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
+}
+
+.last-workout-hint {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+}
+
+.hint-last {
+    color: #888;
+    font-size: 1.1rem;
+}
+
+.pass-a-text {
+    color: #00ff88;
+}
+
+.pass-b-text {
+    color: #00aaff;
 }
 
 .quick-stat {
@@ -172,9 +196,18 @@ button {
 .stats-link {
     margin-top: 3rem;
     color: var(--fg-muted);
-    font-size: 0.7rem;
-    letter-spacing: 0.2em;
-    padding: 1rem;
+    font-size: 0.9rem;
+    letter-spacing: 0.15em;
+    padding: 1rem 2rem;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    -webkit-tap-highlight-color: rgba(0, 255, 136, 0.2);
+}
+
+.stats-link:active {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--fg-secondary);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -310,11 +343,17 @@ button {
 .overview-item {
     display: flex;
     align-items: center;
+    width: 100%;
     padding: 1rem 1.25rem;
     gap: 0.75rem;
     border-radius: 12px;
     cursor: pointer;
     transition: background 0.15s;
+    background: transparent;
+    border: 1px solid transparent;
+    text-align: left;
+    font-size: 1rem;
+    color: var(--fg);
 }
 
 .overview-item:active {
@@ -328,6 +367,26 @@ button {
 
 .overview-item.done {
     opacity: 0.6;
+}
+
+.superset-group {
+    border-left: 2px solid var(--fg-muted);
+    margin-left: 0.75rem;
+    padding-left: 0;
+    margin-bottom: 0.5rem;
+}
+
+.superset-group .overview-item {
+    margin-left: 0;
+    border-radius: 0 8px 8px 0;
+}
+
+.superset-group .overview-item:first-child {
+    border-radius: 0 8px 0 0;
+}
+
+.superset-group .overview-item:last-child {
+    border-radius: 0 0 8px 0;
 }
 
 .overview-icon {
@@ -366,18 +425,166 @@ button {
     border-top: 1px solid var(--border);
 }
 
-.cancel-workout-btn {
-    width: 100%;
+.workout-footer {
+    display: flex;
+    gap: 1rem;
+}
+
+.back-btn {
+    flex: 1;
     padding: 0.75rem;
     font-size: 0.75rem;
     color: var(--fg-muted);
+    background: transparent;
     border: 1px solid var(--border);
-    letter-spacing: 0.1em;
+    border-radius: 8px;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.back-btn:active {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.pause-icon {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='6' y='4' width='4' height='16' rx='1' fill='%23e8e8e8'/%3E%3Crect x='14' y='4' width='4' height='16' rx='1' fill='%23e8e8e8'/%3E%3C/svg%3E") center/contain no-repeat;
+    vertical-align: middle;
+}
+
+.cancel-workout-btn {
+    flex: 1;
+    padding: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    letter-spacing: 0.05em;
 }
 
 .cancel-workout-btn:active {
     color: #ff4444;
     border-color: #ff4444;
+}
+
+/* Paused workout banner */
+.paused-workout-banner {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.paused-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.paused-label {
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.paused-routine {
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.paused-progress {
+    display: none; /* Hide on mobile for compactness */
+}
+
+.resume-btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: transparent;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    white-space: nowrap;
+}
+
+.resume-btn:active {
+    background: rgba(0, 255, 136, 0.1);
+}
+
+/* Confirmation dialog */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.confirm-dialog {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    max-width: 320px;
+    width: 100%;
+}
+
+.confirm-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+}
+
+.confirm-text {
+    font-size: 1rem;
+    color: var(--fg-muted);
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+}
+
+.confirm-buttons {
+    display: flex;
+    gap: 1rem;
+}
+
+.confirm-cancel {
+    flex: 1;
+    padding: 0.75rem;
+    font-size: 1rem;
+    color: var(--fg-muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.confirm-ok {
+    flex: 1;
+    padding: 0.75rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--bg);
+    background: #ff4444;
+    border: none;
+    border-radius: 8px;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -402,12 +609,10 @@ button {
 }
 
 .superset-indicator {
-    font-size: 0.65rem;
-    color: #ffaa00;
-    background: rgba(255, 170, 0, 0.1);
-    padding: 0.25rem 0.75rem;
-    margin-bottom: 1rem;
-    letter-spacing: 0.1em;
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.05em;
 }
 
 .exercise-name-big {
@@ -497,6 +702,17 @@ button {
 
 .rep-button.target:active {
     background: var(--accent-a);
+    color: var(--bg-primary);
+}
+
+.rep-button.last {
+    border-color: #00aaff;
+    color: #00aaff;
+    background: rgba(0, 170, 255, 0.1);
+}
+
+.rep-button.last:active {
+    background: #00aaff;
     color: var(--bg-primary);
 }
 
@@ -667,7 +883,7 @@ button {
     letter-spacing: 0.15em;
 }
 
-.back-btn {
+.stats-back-btn {
     width: 48px;
     height: 48px;
     font-size: 1.5rem;
@@ -1042,21 +1258,21 @@ button {
 
 /* Progressive Overload */
 .overload-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
-    margin-bottom: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
 }
 
 .overload-item {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.875rem 1rem;
+    gap: 0.4rem;
+    padding: 0.5rem 0.5rem;
     background: rgba(0, 0, 0, 0.2);
-    border-left: 4px solid var(--border);
-    border-radius: 0 8px 8px 0;
-    min-height: 52px;
+    border-left: 3px solid var(--border);
+    border-radius: 0 6px 6px 0;
+    min-height: 40px;
 }
 
 .overload-item.improved { border-left-color: var(--accent-a); background: rgba(0, 255, 136, 0.08); }
@@ -1065,11 +1281,61 @@ button {
 .overload-item.first { border-left-color: #00ccff; background: rgba(0, 204, 255, 0.08); }
 
 .overload-icon {
-    font-size: 1.5rem;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    display: inline-block;
+}
+
+/* Up arrow for improved - green */
+.overload-item.improved .overload-icon {
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 19V5' stroke='%2300ff88' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M6 11l6-6 6 6' stroke='%2300ff88' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+/* Right arrow for maintained - cyan */
+.overload-item.maintained .overload-icon {
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 12h14' stroke='%2300bcd4' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M13 6l6 6-6 6' stroke='%2300bcd4' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+/* Down arrow for regressed - light gray almost white */
+.overload-item.regressed .overload-icon {
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4v14' stroke='%23e8e8e8' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M6 13l6 6 6-6' stroke='%23e8e8e8' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+/* New badge for first time - light gray, smaller */
+.overload-item.first .overload-icon {
+    width: 22px;
+    height: 22px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='5' width='20' height='14' rx='2' stroke='%23888' stroke-width='2' fill='none'/%3E%3Ctext x='12' y='16' text-anchor='middle' fill='%23888' font-size='10' font-weight='bold' font-family='system-ui'%3ENY%3C/text%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+/* Legend icons */
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.legend-icon {
+    width: 18px;
+    height: 18px;
+    display: inline-block;
+}
+
+.legend-item.improved .legend-icon {
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 19V5' stroke='%2300ff88' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M6 11l6-6 6 6' stroke='%2300ff88' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+.legend-item.maintained .legend-icon {
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 12h14' stroke='%2300bcd4' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M13 6l6 6-6 6' stroke='%2300bcd4' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+.legend-item.regressed .legend-icon {
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4v14' stroke='%23e8e8e8' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M6 13l6 6 6-6' stroke='%23e8e8e8' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E") center/contain no-repeat;
 }
 
 .overload-name {
-    font-size: 0.9rem;
+    font-size: 0.75rem;
     color: var(--fg-secondary);
     white-space: nowrap;
     overflow: hidden;
@@ -1175,6 +1441,44 @@ button {
 /* Exercise Stats Section */
 .exercise-stats-section {
     margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.exercise-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+
+.exercise-stats-grid .stat-card {
+    padding: 0.75rem;
+    margin-bottom: 0;
+}
+
+.exercise-stats-grid .stat-card-title {
+    font-size: 0.7rem;
+    margin-bottom: 0.5rem;
+}
+
+.exercise-stats-grid .stat-grid {
+    gap: 0.25rem;
+}
+
+.exercise-stats-grid .stat-item {
+    padding: 0.4rem;
+}
+
+.exercise-stats-grid .stat-value {
+    font-size: 1rem;
+}
+
+.exercise-stats-grid .stat-label {
+    font-size: 0.6rem;
+}
+
+.exercise-stats-grid .mini-chart {
+    height: 24px;
+    margin-top: 0.5rem;
 }
 
 /* History with efficiency */

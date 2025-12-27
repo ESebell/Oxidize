@@ -1,0 +1,69 @@
+{
+  "routines": [
+    {
+      "id": "A",
+      "name": "Pass A",
+      "focus": "Ben, Press & Triceps",
+      "finisher": "Sit-ups & Stretch",
+      "exercises": [
+        { "name": "Knäböj", "sets": 3, "reps": "5-8" },
+        { "name": "Bänkpress", "sets": 3, "reps": "5-8" },
+        { "name": "Hip Thrusts", "sets": 3, "reps": "8-12" },
+        { "name": "Latsdrag", "sets": 3, "reps": "8-10" },
+        { 
+          "name": "Leg Curls", 
+          "sets": 2, 
+          "reps": "12-15",
+          "superset_with": "Dips"
+        },
+        { 
+          "name": "Dips", 
+          "sets": 2, 
+          "reps": "AMRAP",
+          "superset_with": "Leg Curls"
+        },
+        { "name": "Stående vadpress", "sets": 3, "reps": "12-15" }
+      ]
+    },
+    {
+      "id": "B",
+      "name": "Pass B",
+      "focus": "Rygg, Axlar & Biceps",
+      "finisher": "Sit-ups & Stretch",
+      "exercises": [
+        { "name": "Marklyft", "sets": 3, "reps": "5" },
+        { "name": "Militärpress", "sets": 3, "reps": "8-10" },
+        { "name": "Sittande rodd", "sets": 3, "reps": "10-12" },
+        { 
+          "name": "Sidolyft", 
+          "sets": 3, 
+          "reps": "12-15",
+          "superset_with": "Facepulls",
+          "superset_name": "Axel-fokus"
+        },
+        { 
+          "name": "Facepulls", 
+          "sets": 3, 
+          "reps": "15",
+          "superset_with": "Sidolyft",
+          "superset_name": "Axel-fokus"
+        },
+        { 
+          "name": "Hammercurls", 
+          "sets": 3, 
+          "reps": "10-12",
+          "superset_with": "Sittande vadpress",
+          "superset_name": "Armar/Vader"
+        },
+        { 
+          "name": "Sittande vadpress", 
+          "sets": 3, 
+          "reps": "15-20",
+          "superset_with": "Hammercurls",
+          "superset_name": "Armar/Vader"
+        }
+      ]
+    }
+  ]
+}
+

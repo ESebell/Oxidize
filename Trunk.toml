@@ -1,8 +1,8 @@
 [build]
 target = "index.html"
 dist = "dist"
-# Skip wasm-opt by not specifying any optimization
-no_minification = true
+# Use relative paths for GitHub Pages subdirectory
+public_url = "./"
 
 [watch]
 watch = ["src", "index.html", "style.css"]

@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use crate::types::*;
 
+const PAUSED_WORKOUT_KEY: &str = "oxidize_paused_workout";
+
 // LocalStorage fallback for simpler key-value storage
 pub fn get_local_storage() -> Option<web_sys::Storage> {
     web_sys::window()?.local_storage().ok()?
@@ -10,7 +12,7 @@ pub fn get_local_storage() -> Option<web_sys::Storage> {
 pub fn save_data(data: &Database) -> Result<(), String> {
     let storage = get_local_storage().ok_or("No localStorage")?;
     let json = serde_json::to_string(data).map_err(|e| e.to_string())?;
-    storage.set_item("oxidize_data", &json).map_err(|_| "Failed to save")?;
+    storage.set_item("oxidize_db_v2", &json).map_err(|_| "Failed to save")?;
     Ok(())
 }
 
@@ -20,12 +22,32 @@ pub fn load_data() -> Database {
         None => return Database::default(),
     };
     
-    let json = match storage.get_item("oxidize_data") {
+    let json = match storage.get_item("oxidize_db_v2") {
         Ok(Some(j)) => j,
         _ => return Database::default(),
     };
     
     serde_json::from_str(&json).unwrap_or_default()
+}
+
+// Paused workout functions
+pub fn save_paused_workout(paused: &PausedWorkout) -> Result<(), String> {
+    let storage = get_local_storage().ok_or("No localStorage")?;
+    let json = serde_json::to_string(paused).map_err(|e| e.to_string())?;
+    storage.set_item(PAUSED_WORKOUT_KEY, &json).map_err(|_| "Failed to save paused workout")?;
+    Ok(())
+}
+
+pub fn load_paused_workout() -> Option<PausedWorkout> {
+    let storage = get_local_storage()?;
+    let json = storage.get_item(PAUSED_WORKOUT_KEY).ok()??;
+    serde_json::from_str(&json).ok()
+}
+
+pub fn clear_paused_workout() {
+    if let Some(storage) = get_local_storage() {
+        let _ = storage.remove_item(PAUSED_WORKOUT_KEY);
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -210,10 +232,10 @@ pub fn get_routine_b() -> Routine {
             Exercise::standard("Marklyft", 3, "5"),
             Exercise::standard("Militärpress", 3, "8-10"),
             Exercise::standard("Sittande rodd", 3, "10-12"),
-            Exercise::superset("Sidolyft", 3, "12-15", "Facepulls", Some("Axel-fokus")),
-            Exercise::superset("Facepulls", 3, "15", "Sidolyft", Some("Axel-fokus")),
-            Exercise::superset("Hammercurls", 3, "10-12", "Sittande vadpress", Some("Armar/Vader")),
-            Exercise::superset("Sittande vadpress", 3, "15-20", "Hammercurls", Some("Armar/Vader")),
+            Exercise::superset("Sidolyft", 3, "12-15", "Hammercurls", None),
+            Exercise::superset("Hammercurls", 3, "10-12", "Sidolyft", None),
+            Exercise::superset("Facepulls", 3, "15", "Sittande vadpress", None),
+            Exercise::superset("Sittande vadpress", 3, "15-20", "Facepulls", None),
         ],
         finisher: "Sit-ups & Stretch".to_string(),
     }
