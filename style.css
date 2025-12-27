@@ -984,7 +984,21 @@ button {
     font-size: 2rem;
     color: var(--fg-secondary);
     font-variant-numeric: tabular-nums;
-    margin-bottom: 3rem;
+    margin-bottom: 1rem;
+}
+
+.finish-stats {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 2.5rem;
+}
+
+.finish-stat {
+    font-size: 1rem;
+    color: var(--fg-muted);
+    padding: 0.5rem 1rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
 }
 
 .finish-save-btn {

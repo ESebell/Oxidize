@@ -738,8 +738,30 @@ fn WorkoutActive(
                     if is_finished.get() {
                         // Finished view
                         let duration_mins = std::cmp::max(1, (elapsed.get() + 30) / 60); // Round up, minimum 1 min
-                        // Calories: ~5 METs for strength training × bodyweight × hours
-                        let calories = ((bodyweight * duration_mins as f64) / 12.0).round() as i64;
+                        
+                        // Calculate total volume (kg × reps)
+                        let total_volume: f64 = exercises.get().iter()
+                            .flat_map(|ex| ex.sets_completed.iter())
+                            .map(|set| set.weight * set.reps as f64)
+                            .sum();
+                        
+                        // Calculate efficiency (kg/min)
+                        let efficiency = if duration_mins > 0 { 
+                            total_volume / duration_mins as f64 
+                        } else { 
+                            0.0 
+                        };
+                        
+                        // Base MET = 5.0, increase slightly for high efficiency workouts
+                        // Typical efficiency: 50-150 kg/min
+                        // Add up to 1.5 MET for very intense workouts (200+ kg/min)
+                        let efficiency_bonus = (efficiency / 200.0).min(1.0) * 1.5;
+                        let met = 5.0 + efficiency_bonus;
+                        
+                        // Calories = (minutes / 60) × bodyweight × MET
+                        let hours = duration_mins as f64 / 60.0;
+                        let calories = (hours * bodyweight * met).round() as i64;
+                        
                         let health_url = format!(
                             "shortcuts://run-shortcut?name=Oxidize&input=text&text={},{}",
                             duration_mins, calories
@@ -749,6 +771,10 @@ fn WorkoutActive(
                                 <div class="finish-icon">"✓"</div>
                                 <div class="finish-title">"Bra jobbat!"</div>
                                 <div class="finish-time">{format_time(elapsed.get())}</div>
+                                <div class="finish-stats">
+                                    <span class="finish-stat">{format!("{:.0} kg volym", total_volume)}</span>
+                                    <span class="finish-stat">{format!("{} kcal", calories)}</span>
+                                </div>
                                 <button class="finish-save-btn" on:click=move |_| {
                                     let exs = exercises.get();
                                     let records: Vec<ExerciseRecord> = exs.iter()
