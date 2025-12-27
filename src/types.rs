@@ -109,9 +109,23 @@ pub struct TotalStats {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AppView {
+    Login,
+    Register,
     Dashboard,
     Workout(String),
     Stats,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AuthUser {
+    pub id: String,
+    pub email: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AuthSession {
+    pub access_token: String,
+    pub user: AuthUser,
 }
 
 /// Paused workout state - saved when leaving mid-workout

@@ -46,6 +46,129 @@ button {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   AUTH (Login / Register)
+   ═══════════════════════════════════════════════════════════════ */
+
+.auth-container {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background: var(--bg-primary);
+}
+
+.auth-logo {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    color: var(--accent-a);
+    margin-bottom: 2rem;
+}
+
+.auth-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 360px;
+}
+
+.auth-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.auth-input {
+    width: 100%;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--fg-primary);
+    font-family: var(--font);
+    font-size: 1rem;
+}
+
+.auth-input:focus {
+    outline: none;
+    border-color: var(--accent-a);
+}
+
+.auth-input::placeholder {
+    color: var(--fg-muted);
+}
+
+.auth-button {
+    width: 100%;
+    padding: 1rem;
+    background: var(--accent-a);
+    color: var(--bg-primary);
+    font-weight: 600;
+    font-size: 1rem;
+    border-radius: 8px;
+    margin-top: 0.5rem;
+    transition: opacity 0.2s;
+}
+
+.auth-button:hover {
+    opacity: 0.9;
+}
+
+.auth-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.auth-error {
+    background: rgba(255, 68, 68, 0.15);
+    border: 1px solid #ff4444;
+    color: #ff6666;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.auth-switch {
+    margin-top: 1.5rem;
+    text-align: center;
+    color: var(--fg-secondary);
+    font-size: 0.9rem;
+}
+
+.auth-link {
+    color: var(--accent-a);
+    font-weight: 500;
+    padding: 0.25rem;
+}
+
+.auth-link:hover {
+    text-decoration: underline;
+}
+
+.logout-btn {
+    padding: 0.5rem 0.75rem;
+    background: transparent;
+    border: 1px solid var(--fg-muted);
+    border-radius: 6px;
+    color: var(--fg-secondary);
+    font-size: 0.75rem;
+    transition: all 0.2s;
+}
+
+.logout-btn:hover {
+    border-color: #ff4444;
+    color: #ff4444;
+}
+
+/* ═══════════════════════════════════════════════════════════════
    DASHBOARD
    ═══════════════════════════════════════════════════════════════ */
 
