@@ -146,27 +146,77 @@ impl MuscleGroup {
     }
 }
 
-/// Map exercises to muscle groups
-pub fn get_muscle_groups(exercise: &str) -> Vec<MuscleGroup> {
+/// Map exercises to muscle groups with weights
+/// Returns Vec<(MuscleGroup, weight)> where:
+/// - Primary muscles (main target) = 3 points
+/// - Secondary muscles (assistance) = 1 point
+pub fn get_muscle_groups_weighted(exercise: &str) -> Vec<(MuscleGroup, u32)> {
     match exercise {
-        "Knäböj" => vec![MuscleGroup::Quads, MuscleGroup::Glutes, MuscleGroup::Core],
-        "Bänkpress" => vec![MuscleGroup::Chest, MuscleGroup::Triceps, MuscleGroup::Shoulders],
-        "Hip Thrusts" => vec![MuscleGroup::Glutes, MuscleGroup::Hamstrings],
-        "Latsdrag" => vec![MuscleGroup::Back, MuscleGroup::Biceps],
-        "Leg Curls" => vec![MuscleGroup::Hamstrings],
-        "Dips" => vec![MuscleGroup::Chest, MuscleGroup::Triceps],
-        "Stående vadpress" | "Sittande vadpress" => vec![MuscleGroup::Calves],
-        "Marklyft" => vec![MuscleGroup::Back, MuscleGroup::Hamstrings, MuscleGroup::Glutes, MuscleGroup::Core],
-        "Militärpress" => vec![MuscleGroup::Shoulders, MuscleGroup::Triceps],
-        "Sittande rodd" => vec![MuscleGroup::Back, MuscleGroup::Biceps],
-        "Sidolyft" => vec![MuscleGroup::Shoulders],
-        "Facepulls" => vec![MuscleGroup::Shoulders, MuscleGroup::Back],
-        "Hammercurls" => vec![MuscleGroup::Biceps],
+        // Pass A
+        "Knäböj" => vec![
+            (MuscleGroup::Quads, 3),      // Primary
+            (MuscleGroup::Glutes, 3),     // Primary
+            (MuscleGroup::Core, 1),       // Secondary (stabilizer)
+        ],
+        "Bänkpress" => vec![
+            (MuscleGroup::Chest, 3),      // Primary
+            (MuscleGroup::Triceps, 1),    // Secondary
+            (MuscleGroup::Shoulders, 1),  // Secondary
+        ],
+        "Hip Thrusts" => vec![
+            (MuscleGroup::Glutes, 3),     // Primary
+            (MuscleGroup::Hamstrings, 1), // Secondary
+        ],
+        "Latsdrag" => vec![
+            (MuscleGroup::Back, 3),       // Primary
+            (MuscleGroup::Biceps, 1),     // Secondary
+        ],
+        "Leg Curls" => vec![
+            (MuscleGroup::Hamstrings, 3), // Primary (isolation)
+        ],
+        "Dips" => vec![
+            (MuscleGroup::Chest, 3),      // Primary
+            (MuscleGroup::Triceps, 3),    // Primary
+        ],
+        "Stående vadpress" | "Sittande vadpress" => vec![
+            (MuscleGroup::Calves, 3),     // Primary (isolation)
+        ],
+        // Pass B
+        "Marklyft" => vec![
+            (MuscleGroup::Back, 3),       // Primary
+            (MuscleGroup::Hamstrings, 3), // Primary
+            (MuscleGroup::Glutes, 3),     // Primary
+            (MuscleGroup::Core, 1),       // Secondary (stabilizer)
+        ],
+        "Militärpress" => vec![
+            (MuscleGroup::Shoulders, 3),  // Primary
+            (MuscleGroup::Triceps, 1),    // Secondary
+        ],
+        "Sittande rodd" => vec![
+            (MuscleGroup::Back, 3),       // Primary
+            (MuscleGroup::Biceps, 1),     // Secondary
+        ],
+        "Sidolyft" => vec![
+            (MuscleGroup::Shoulders, 3),  // Primary (isolation)
+        ],
+        "Facepulls" => vec![
+            (MuscleGroup::Shoulders, 3),  // Primary (rear delts)
+            (MuscleGroup::Back, 1),       // Secondary (upper back)
+        ],
+        "Hammercurls" => vec![
+            (MuscleGroup::Biceps, 3),     // Primary (isolation)
+        ],
         _ => vec![],
     }
 }
 
+/// Legacy function for compatibility
+pub fn get_muscle_groups(exercise: &str) -> Vec<MuscleGroup> {
+    get_muscle_groups_weighted(exercise).into_iter().map(|(mg, _)| mg).collect()
+}
+
 /// Calculate muscle frequency in last N days
+/// Uses weighted scoring: primary muscles +3, secondary +1, multiplied by sets
 pub fn calculate_muscle_frequency(db: &Database, days: i64) -> HashMap<MuscleGroup, u32> {
     let cutoff = chrono::Utc::now().timestamp() - (days * 86400);
     let mut freq: HashMap<MuscleGroup, u32> = HashMap::new();
@@ -180,8 +230,12 @@ pub fn calculate_muscle_frequency(db: &Database, days: i64) -> HashMap<MuscleGro
         if session.timestamp < cutoff { continue; }
         
         for exercise in &session.exercises {
-            for muscle in get_muscle_groups(&exercise.name) {
-                *freq.entry(muscle).or_insert(0) += 1;
+            let sets_completed = exercise.sets.len() as u32;
+            if sets_completed == 0 { continue; }
+            
+            for (muscle, weight) in get_muscle_groups_weighted(&exercise.name) {
+                // Score = muscle_weight * sets_completed
+                *freq.entry(muscle).or_insert(0) += weight * sets_completed;
             }
         }
     }

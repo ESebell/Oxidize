@@ -408,6 +408,10 @@ fn WorkoutActive(
     let routine_name_pause = routine_name.clone();
     let is_pass_a = routine_name.contains("A");
     
+    // Load bodyweight for calorie calculation
+    let db = storage::load_data();
+    let bodyweight = db.get_bodyweight();
+    
     // State
     let total_exercises = data.exercises.len();
     let (exercises, set_exercises) = create_signal(data.exercises);
@@ -734,9 +738,11 @@ fn WorkoutActive(
                     if is_finished.get() {
                         // Finished view
                         let duration_mins = std::cmp::max(1, (elapsed.get() + 30) / 60); // Round up, minimum 1 min
+                        // Calories: ~5 METs for strength training × bodyweight × hours
+                        let calories = ((bodyweight * duration_mins as f64) / 12.0).round() as i64;
                         let health_url = format!(
-                            "shortcuts://run-shortcut?name=Oxidize&input=text&text={}",
-                            duration_mins
+                            "shortcuts://run-shortcut?name=Oxidize&input=text&text={},{}",
+                            duration_mins, calories
                         );
                         view! {
                             <div class="finish-screen">
@@ -1167,33 +1173,40 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                 
                 // ═══════════════════════════════════════════════════════════════
                 // 5. MUSCLE HEATMAP (7 dagar)
+                // Weighted scoring: primary muscles +3, secondary +1, × sets
                 // ═══════════════════════════════════════════════════════════════
                 <div class="stat-card">
                     <div class="stat-card-title">"Muskelaktivitet (7 dagar)"</div>
                     <div class="heatmap-grid">
                         {MuscleGroup::all().into_iter().map(|mg| {
-                            let count = *summary.muscle_frequency.get(&mg).unwrap_or(&0);
-                            let heat_class = match count {
+                            let score = *summary.muscle_frequency.get(&mg).unwrap_or(&0);
+                            // New thresholds for weighted scoring:
+                            // 0 = not trained
+                            // 1-8 = low (secondary muscle or skipped)
+                            // 9-17 = moderate (one exercise as primary)
+                            // 18-26 = good (multiple exercises)
+                            // 27+ = high
+                            let heat_class = match score {
                                 0 => "heat-0",
-                                1 => "heat-1",
-                                2 => "heat-2",
-                                3 => "heat-3",
+                                1..=8 => "heat-1",
+                                9..=17 => "heat-2",
+                                18..=26 => "heat-3",
                                 _ => "heat-4",
                             };
                             view! {
                                 <div class=format!("heatmap-item {}", heat_class)>
                                     <span class="heat-name">{mg.name()}</span>
-                                    <span class="heat-count">{count}</span>
+                                    <span class="heat-count">{score}</span>
                                 </div>
                             }
                         }).collect_view()}
                     </div>
                     <div class="heat-legend">
-                        <span class="heat-0">"0"</span>
-                        <span class="heat-1">"1"</span>
-                        <span class="heat-2">"2"</span>
-                        <span class="heat-3">"3"</span>
-                        <span class="heat-4">"4+"</span>
+                        <span class="heat-0">"Vila"</span>
+                        <span class="heat-1">"Låg"</span>
+                        <span class="heat-2">"Ok"</span>
+                        <span class="heat-3">"Bra"</span>
+                        <span class="heat-4">"Hög"</span>
                     </div>
                 </div>
                 
