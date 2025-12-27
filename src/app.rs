@@ -733,6 +733,11 @@ fn WorkoutActive(
                 {move || {
                     if is_finished.get() {
                         // Finished view
+                        let duration_mins = elapsed.get() / 60;
+                        let health_url = format!(
+                            "shortcuts://run-shortcut?name=Oxidize&input=text&text={}",
+                            duration_mins
+                        );
                         view! {
                             <div class="finish-screen">
                                 <div class="finish-icon">"✓"</div>
@@ -752,6 +757,9 @@ fn WorkoutActive(
                                 }>
                                     "Spara pass"
                                 </button>
+                                <a class="health-link" href={health_url} target="_blank">
+                                    "Logga till Health →"
+                                </a>
                             </div>
                         }.into_view()
                     } else if is_resting.get() {
