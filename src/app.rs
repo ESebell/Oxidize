@@ -1003,9 +1003,21 @@ fn WorkoutActive(
 #[component]
 fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, set_auth: WriteSignal<Option<AuthSession>>) -> impl IntoView {
     let db = storage::load_data();
+    let sync_complete = storage::is_sync_complete();
     let initial_bodyweight = db.get_bodyweight();
-    // Use 0.0 for stats summary if no bodyweight set (will show "--" in UI)
-    let summary = stats::get_stats_summary(&db, initial_bodyweight.unwrap_or(0.0));
+    
+    // Determine what to show:
+    // - Not synced yet: None (will show "--.-")
+    // - Synced but no weight: Some(80.0) (default for new users)
+    // - Synced with weight: Some(actual_weight)
+    let display_bodyweight: Option<f64> = if sync_complete {
+        Some(initial_bodyweight.unwrap_or(80.0))
+    } else {
+        None // Still loading from Supabase
+    };
+    
+    // Use 80.0 for stats if not set
+    let summary = stats::get_stats_summary(&db, initial_bodyweight.unwrap_or(80.0));
     let power_history = stats::get_power_score_history(&db);
     let all_stats = db.get_all_exercise_stats();
     
@@ -1024,13 +1036,13 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
         .cloned()
         .collect();
     
-    // Reactive bodyweight signal (Option<f64> - None means not set)
-    let (bodyweight, set_bodyweight) = create_signal(initial_bodyweight);
+    // Reactive bodyweight signal (Option<f64> - None means still loading)
+    let (bodyweight, set_bodyweight) = create_signal(display_bodyweight);
     
     // State for bodyweight input
     let (editing_weight, set_editing_weight) = create_signal(false);
     let (weight_input, set_weight_input) = create_signal(
-        initial_bodyweight.map(|w| format!("{:.1}", w)).unwrap_or_default()
+        display_bodyweight.map(|w| format!("{:.1}", w)).unwrap_or_default()
     );
     
     let save_bodyweight = move |_| {

@@ -434,6 +434,8 @@ pub fn sync_from_cloud() {
             Ok(_) => web_sys::console::log_1(&"Synced from Supabase".into()),
             Err(e) => web_sys::console::log_1(&format!("Sync failed: {:?}", e).into()),
         }
+        // Mark sync as complete (even if failed, so UI doesn't show loading forever)
+        crate::storage::mark_sync_complete();
     });
 }
 

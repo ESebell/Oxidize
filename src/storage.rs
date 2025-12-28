@@ -2,6 +2,22 @@ use serde::{Deserialize, Serialize};
 use crate::types::*;
 
 const PAUSED_WORKOUT_KEY: &str = "oxidize_paused_workout";
+const SYNC_COMPLETE_KEY: &str = "oxidize_sync_complete";
+
+// Track whether we've synced from Supabase this session
+pub fn is_sync_complete() -> bool {
+    get_local_storage()
+        .and_then(|s| s.get_item(SYNC_COMPLETE_KEY).ok())
+        .flatten()
+        .map(|v| v == "true")
+        .unwrap_or(false)
+}
+
+pub fn mark_sync_complete() {
+    if let Some(storage) = get_local_storage() {
+        let _ = storage.set_item(SYNC_COMPLETE_KEY, "true");
+    }
+}
 
 // LocalStorage fallback for simpler key-value storage
 pub fn get_local_storage() -> Option<web_sys::Storage> {
