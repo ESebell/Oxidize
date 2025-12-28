@@ -1135,10 +1135,10 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                                     }
                                 }}
                             </span>
-                            <span class="ptw-unit">"× kroppsvikt"</span>
+                            <span class="ptw-unit">"Styrkeratio"</span>
                         </div>
                         
-                        // Bodyweight editor
+                        // Bodyweight reference with editor
                         <div class="bodyweight-edit">
                             {move || {
                                 if editing_weight.get() {
@@ -1161,7 +1161,7 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                                             set_weight_input.set(format!("{:.1}", bodyweight.get()));
                                             set_editing_weight.set(true);
                                         }>
-                                            <span class="bw-label">"Din vikt: "</span>
+                                            <span class="bw-label">"Baserat på: "</span>
                                             <span class="bw-value">{format!("{:.1}", bw)}</span>
                                             <span class="bw-kg">" kg"</span>
                                             <span class="bw-edit-icon">" ✎"</span>
@@ -1171,7 +1171,7 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                             }}
                         </div>
                     </div>
-                    <div class="ptw-hint">"Ju mer vikt du tappar med bibehållen styrka, desto högre ratio"</div>
+                    <div class="ptw-hint">"Total styrka (Big 4) delat med kroppsvikt"</div>
                 </div>
                 
                 // ═══════════════════════════════════════════════════════════════
