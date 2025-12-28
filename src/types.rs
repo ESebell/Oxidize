@@ -9,6 +9,7 @@ pub struct Exercise {
     pub superset_with: Option<String>,
     pub superset_name: Option<String>,
     pub is_bodyweight: bool,
+    pub duration_secs: Option<u32>,  // Some(30) = timed exercise, None = reps-based
 }
 
 impl Exercise {
@@ -21,6 +22,7 @@ impl Exercise {
             superset_with: None,
             superset_name: None,
             is_bodyweight: false,
+            duration_secs: None,
         }
     }
 
@@ -33,6 +35,7 @@ impl Exercise {
             superset_with: Some(partner.to_string()),
             superset_name: ss_name.map(|s| s.to_string()),
             is_bodyweight: false,
+            duration_secs: None,
         }
     }
     
@@ -45,6 +48,20 @@ impl Exercise {
             superset_with: None,
             superset_name: None,
             is_bodyweight: true,
+            duration_secs: None,
+        }
+    }
+    
+    pub fn timed_finisher(name: &str, sets: u8, duration: u32) -> Self {
+        Self {
+            name: name.to_string(),
+            sets,
+            reps_target: format!("{} sek", duration),
+            is_superset: false,
+            superset_with: None,
+            superset_name: None,
+            is_bodyweight: true,
+            duration_secs: Some(duration),
         }
     }
 }

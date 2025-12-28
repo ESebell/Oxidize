@@ -968,6 +968,135 @@ button {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   TIMER EXERCISE (e.g., Mountain Climbers)
+   ═══════════════════════════════════════════════════════════════ */
+
+.timer-section {
+    width: 100%;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.timer-selector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+}
+
+.timer-label {
+    font-size: 0.85rem;
+    letter-spacing: 0.15em;
+    color: var(--fg-muted);
+    text-transform: uppercase;
+}
+
+.duration-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.duration-button {
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    font-weight: 600;
+    background: var(--bg-card);
+    border: 2px solid var(--border);
+    color: var(--fg-secondary);
+    border-radius: 8px;
+    min-width: 50px;
+    transition: all 0.15s;
+}
+
+.duration-button.target {
+    border-color: var(--accent-a);
+    color: var(--accent-a);
+}
+
+.duration-button.selected {
+    background: var(--accent-a);
+    border-color: var(--accent-a);
+    color: var(--bg-primary);
+}
+
+.duration-button.selected.target {
+    background: var(--accent-a);
+    border-color: var(--accent-a);
+    color: var(--bg-primary);
+}
+
+.timer-start-btn {
+    width: 100%;
+    padding: 1.25rem;
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    background: var(--accent-a);
+    color: var(--bg-primary);
+    border: none;
+    border-radius: 12px;
+    margin-top: 0.5rem;
+}
+
+.timer-start-btn:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+}
+
+.timer-target-hint {
+    font-size: 0.7rem;
+    color: var(--fg-muted);
+    letter-spacing: 0.1em;
+}
+
+.timer-countdown {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+}
+
+.timer-display {
+    font-size: 5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-primary);
+    text-shadow: 0 0 40px rgba(0, 255, 136, 0.3);
+    animation: timer-pulse 1s ease-in-out infinite;
+}
+
+@keyframes timer-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.timer-stop-btn {
+    padding: 0.75rem 2rem;
+    font-size: 1rem;
+    color: var(--fg-muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+/* Red flash when timer ends */
+.timer-flash {
+    animation: flash-red 0.8s ease-out;
+}
+
+@keyframes flash-red {
+    0% { background: #ff0000; }
+    20% { background: #ff0000; }
+    100% { background: var(--bg-primary); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
    REST SCREEN
    ═══════════════════════════════════════════════════════════════ */
 

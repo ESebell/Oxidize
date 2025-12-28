@@ -275,7 +275,7 @@ pub fn get_routine_a() -> Routine {
         ],
         finishers: vec![
             Exercise::finisher("Shoulder Taps", 3, "20"),
-            Exercise::finisher("Mountain Climbers", 3, "30s"),
+            Exercise::timed_finisher("Mountain Climbers", 3, 30),
         ],
     }
 }

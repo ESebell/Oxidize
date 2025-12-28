@@ -488,12 +488,21 @@ fn WorkoutActive(
     let (is_saving, set_is_saving) = create_signal(false);
     let (show_sync_warning, set_show_sync_warning) = create_signal(false);
     
+    // Timer state for timed exercises (like Mountain Climbers)
+    let (timer_running, set_timer_running) = create_signal(false);
+    let (timer_selected_duration, set_timer_selected_duration) = create_signal(30u32);
+    let (timer_remaining, set_timer_remaining) = create_signal(0i32);
+    let (show_timer_flash, set_show_timer_flash) = create_signal(false);
+    
     // Jump to specific exercise
     let jump_to_exercise = move |idx: usize| {
         set_current_idx.set(idx);
         set_is_resting.set(false);
         set_show_overview.set(false);
     };
+    
+    // Flag to signal timer completion (checked in a separate effect)
+    let (timer_just_completed, set_timer_just_completed) = create_signal(false);
     
     // Timer
     create_effect(move |_| {
@@ -502,6 +511,22 @@ fn WorkoutActive(
             set_elapsed.set(now - start_time.get());
             if is_resting.get() && last_set_time.get() > 0 {
                 set_rest_elapsed.set(now - last_set_time.get());
+            }
+            // Countdown timer for timed exercises
+            if timer_running.get() {
+                let remaining = timer_remaining.get() - 1;
+                if remaining <= 0 {
+                    set_timer_remaining.set(0);
+                    set_timer_running.set(false);
+                    set_show_timer_flash.set(true);
+                    // Flash for 800ms then trigger completion
+                    gloo_timers::callback::Timeout::new(800, move || {
+                        set_show_timer_flash.set(false);
+                        set_timer_just_completed.set(true);
+                    }).forget();
+                } else {
+                    set_timer_remaining.set(remaining);
+                }
             }
         });
         on_cleanup(move || drop(handle));
@@ -611,6 +636,28 @@ fn WorkoutActive(
         }
         // Show rest screen
         set_is_resting.set(true);
+    };
+    
+    // Complete a timed set (for exercises like Mountain Climbers)
+    let complete_timed_set = move || {
+        let duration = timer_selected_duration.get();
+        // Use duration as "reps" value for timed exercises
+        complete_set(duration as u8);
+    };
+    
+    // Watch for timer completion and complete the set
+    create_effect(move |_| {
+        if timer_just_completed.get() {
+            set_timer_just_completed.set(false);
+            complete_timed_set();
+        }
+    });
+    
+    // Start timer for timed exercise
+    let start_timer = move |_| {
+        let duration = timer_selected_duration.get();
+        set_timer_remaining.set(duration as i32);
+        set_timer_running.set(true);
     };
     
     // Continue from rest
@@ -940,13 +987,20 @@ fn WorkoutActive(
                         let ex_name = ex.as_ref().map(|e| e.exercise.name.clone()).unwrap_or_default();
                         let is_superset = ex.as_ref().map(|e| e.exercise.is_superset).unwrap_or(false);
                         let is_bodyweight = ex.as_ref().map(|e| e.exercise.is_bodyweight).unwrap_or(false);
+                        let is_timed = ex.as_ref().and_then(|e| e.exercise.duration_secs).is_some();
+                        let target_duration = ex.as_ref().and_then(|e| e.exercise.duration_secs).unwrap_or(30);
                         let ss_with = ex.as_ref().and_then(|e| e.exercise.superset_with.clone());
                         // Exercise hints
                         let is_dumbbell = matches!(ex_name.as_str(), "Hammercurls" | "Sidolyft");
                         let is_alternating = matches!(ex_name.as_str(), "Utfallssteg" | "Dead Bug");
                         
+                        // Initialize timer duration when exercise changes
+                        if is_timed && timer_selected_duration.get() != target_duration {
+                            set_timer_selected_duration.set(target_duration);
+                        }
+                        
                         view! {
-                            <div class="exercise-screen">
+                            <div class=move || if show_timer_flash.get() { "exercise-screen timer-flash" } else { "exercise-screen" }>
                                 // Progress
                                 <div class="exercise-progress">
                                     {move || format!("Set {} av {}", current_set_num(), total_sets())}
@@ -995,47 +1049,111 @@ fn WorkoutActive(
                                     </div>
                                 })}
                                 
-                                // Rep buttons - dynamically centered around target
-                                <div class="rep-label">"Tryck antal reps:"</div>
-                                <div class="rep-buttons">
-                                    {move || {
-                                        let ex = current_exercise();
-                                        let (min, max) = ex.as_ref()
-                                            .map(|e| parse_target_range(&e.exercise.reps_target))
-                                            .unwrap_or((5, 8));
-                                        let last_reps = ex.as_ref()
-                                            .and_then(|e| e.last_data.as_ref())
-                                            .map(|d| d.reps);
-                                        
-                                        // Center the 12-button grid around the target
-                                        let center = (min + max) / 2;
-                                        let start = (center as i32 - 5).max(1) as u8;
-                                        let end = start + 11; // 12 buttons total
-                                        
-                                        (start..=end).map(|r| {
-                                            let is_last = last_reps == Some(r);
-                                            let is_target = r >= min && r <= max;
-                                            let btn_class = if is_last { 
-                                                "rep-button last" 
-                                            } else if is_target { 
-                                                "rep-button target" 
-                                            } else { 
-                                                "rep-button" 
-                                            };
+                                // TIMED EXERCISE UI
+                                {is_timed.then(|| view! {
+                                    <div class="timer-section">
+                                        {move || if timer_running.get() {
+                                            // Countdown view
                                             view! {
-                                                <button 
-                                                    class=btn_class
-                                                    on:click=move |_| complete_set(r)
-                                                >
-                                                    {r}
-                                                </button>
-                                            }
-                                        }).collect_view()
-                                    }}
-                                </div>
-                                <div class="rep-target-hint">
-                                    {move || format!("Mål: {}", target_reps_str())}
-                                </div>
+                                                <div class="timer-countdown">
+                                                    <div class="timer-display">
+                                                        {move || format!("0:{:02}", timer_remaining.get())}
+                                                    </div>
+                                                    <button class="timer-stop-btn" on:click=move |_| {
+                                                        set_timer_running.set(false);
+                                                        set_timer_remaining.set(0);
+                                                    }>
+                                                        "Avbryt"
+                                                    </button>
+                                                </div>
+                                            }.into_view()
+                                        } else {
+                                            // Duration selector view
+                                            view! {
+                                                <div class="timer-selector">
+                                                    <div class="timer-label">"Välj tid:"</div>
+                                                    <div class="duration-buttons">
+                                                        {[15u32, 20, 25, 30, 35, 40, 45].into_iter().map(|d| {
+                                                            let is_target = d == target_duration;
+                                                            let is_selected = move || timer_selected_duration.get() == d;
+                                                            let btn_class = move || {
+                                                                if is_selected() && is_target {
+                                                                    "duration-button selected target"
+                                                                } else if is_selected() {
+                                                                    "duration-button selected"
+                                                                } else if is_target {
+                                                                    "duration-button target"
+                                                                } else {
+                                                                    "duration-button"
+                                                                }
+                                                            };
+                                                            view! {
+                                                                <button 
+                                                                    class=btn_class
+                                                                    on:click=move |_| set_timer_selected_duration.set(d)
+                                                                >
+                                                                    {format!("{}s", d)}
+                                                                </button>
+                                                            }
+                                                        }).collect_view()}
+                                                    </div>
+                                                    <button class="timer-start-btn" on:click=start_timer>
+                                                        "▶ STARTA"
+                                                    </button>
+                                                    <div class="timer-target-hint">
+                                                        {format!("Mål: {} sek", target_duration)}
+                                                    </div>
+                                                </div>
+                                            }.into_view()
+                                        }}
+                                    </div>
+                                })}
+                                
+                                // REP-BASED EXERCISE UI (not timed)
+                                {(!is_timed).then(|| view! {
+                                    <div class="rep-section">
+                                        <div class="rep-label">"Tryck antal reps:"</div>
+                                        <div class="rep-buttons">
+                                            {move || {
+                                                let ex = current_exercise();
+                                                let (min, max) = ex.as_ref()
+                                                    .map(|e| parse_target_range(&e.exercise.reps_target))
+                                                    .unwrap_or((5, 8));
+                                                let last_reps = ex.as_ref()
+                                                    .and_then(|e| e.last_data.as_ref())
+                                                    .map(|d| d.reps);
+                                                
+                                                // Center the 12-button grid around the target
+                                                let center = (min + max) / 2;
+                                                let start = (center as i32 - 5).max(1) as u8;
+                                                let end = start + 11; // 12 buttons total
+                                                
+                                                (start..=end).map(|r| {
+                                                    let is_last = last_reps == Some(r);
+                                                    let is_target = r >= min && r <= max;
+                                                    let btn_class = if is_last { 
+                                                        "rep-button last" 
+                                                    } else if is_target { 
+                                                        "rep-button target" 
+                                                    } else { 
+                                                        "rep-button" 
+                                                    };
+                                                    view! {
+                                                        <button 
+                                                            class=btn_class
+                                                            on:click=move |_| complete_set(r)
+                                                        >
+                                                            {r}
+                                                        </button>
+                                                    }
+                                                }).collect_view()
+                                            }}
+                                        </div>
+                                        <div class="rep-target-hint">
+                                            {move || format!("Mål: {}", target_reps_str())}
+                                        </div>
+                                    </div>
+                                })}
                                 
                                 // Skip button
                                 <button class="skip-exercise-btn" on:click=skip_exercise>
