@@ -4,6 +4,15 @@ dist = "dist"
 # Use relative paths for GitHub Pages subdirectory
 public_url = "./"
 
+[[hooks]]
+stage = "pre_build"
+command = "sh"
+command_arguments = ["-c", "true"]
+
+# Disable wasm-opt to avoid compatibility issues
+[tools]
+wasm_opt = "Off"
+
 [watch]
 watch = ["src", "index.html", "style.css"]
 

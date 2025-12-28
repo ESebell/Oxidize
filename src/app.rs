@@ -1002,22 +1002,42 @@ fn WorkoutActive(
 
 #[component]
 fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, set_auth: WriteSignal<Option<AuthSession>>) -> impl IntoView {
+    // Reactive signal for sync status - poll until complete
+    let (sync_status, set_sync_status) = create_signal(storage::get_sync_status().to_string());
+    
+    // Reactive bodyweight signal (Option<f64> - None means still loading)
+    let (bodyweight, set_bodyweight) = create_signal(Option::<f64>::None);
+    
+    // State for bodyweight input
+    let (editing_weight, set_editing_weight) = create_signal(false);
+    let (weight_input, set_weight_input) = create_signal(String::new());
+    
+    // Poll sync status until complete, then load bodyweight
+    create_effect(move |_| {
+        let status = sync_status.get();
+        if status == "pending" {
+            // Still waiting - set up interval to check again
+            let handle = gloo_timers::callback::Interval::new(200, move || {
+                let new_status = storage::get_sync_status();
+                if new_status != "pending" {
+                    set_sync_status.set(new_status.to_string());
+                }
+            });
+            // Keep the interval alive by leaking it (it will stop when status changes)
+            std::mem::forget(handle);
+        } else {
+            // Sync complete - load the actual data
+            let db = storage::load_data();
+            let bw = db.get_bodyweight();
+            let display_bw = Some(bw.unwrap_or(80.0));
+            set_bodyweight.set(display_bw);
+            set_weight_input.set(display_bw.map(|w| format!("{:.1}", w)).unwrap_or_default());
+        }
+    });
+    
     let db = storage::load_data();
-    let sync_complete = storage::is_sync_complete();
-    let initial_bodyweight = db.get_bodyweight();
-    
-    // Determine what to show:
-    // - Not synced yet: None (will show "--.-")
-    // - Synced but no weight: Some(80.0) (default for new users)
-    // - Synced with weight: Some(actual_weight)
-    let display_bodyweight: Option<f64> = if sync_complete {
-        Some(initial_bodyweight.unwrap_or(80.0))
-    } else {
-        None // Still loading from Supabase
-    };
-    
     // Use 80.0 for stats if not set
-    let summary = stats::get_stats_summary(&db, initial_bodyweight.unwrap_or(80.0));
+    let summary = stats::get_stats_summary(&db, db.get_bodyweight().unwrap_or(80.0));
     let power_history = stats::get_power_score_history(&db);
     let all_stats = db.get_all_exercise_stats();
     
@@ -1035,15 +1055,6 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
         .filter(|s| s.timestamp >= two_months_ago)
         .cloned()
         .collect();
-    
-    // Reactive bodyweight signal (Option<f64> - None means still loading)
-    let (bodyweight, set_bodyweight) = create_signal(display_bodyweight);
-    
-    // State for bodyweight input
-    let (editing_weight, set_editing_weight) = create_signal(false);
-    let (weight_input, set_weight_input) = create_signal(
-        display_bodyweight.map(|w| format!("{:.1}", w)).unwrap_or_default()
-    );
     
     let save_bodyweight = move |_| {
         if let Ok(w) = weight_input.get().parse::<f64>() {

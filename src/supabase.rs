@@ -431,11 +431,15 @@ pub async fn fetch_bodyweight() -> Result<(Option<f64>, Vec<crate::storage::Body
 pub fn sync_from_cloud() {
     wasm_bindgen_futures::spawn_local(async {
         match do_sync().await {
-            Ok(_) => web_sys::console::log_1(&"Synced from Supabase".into()),
-            Err(e) => web_sys::console::log_1(&format!("Sync failed: {:?}", e).into()),
+            Ok(_) => {
+                web_sys::console::log_1(&"Synced from Supabase".into());
+                crate::storage::mark_sync_success();
+            },
+            Err(e) => {
+                web_sys::console::log_1(&format!("Sync failed: {:?}", e).into());
+                crate::storage::mark_sync_failed();
+            },
         }
-        // Mark sync as complete (even if failed, so UI doesn't show loading forever)
-        crate::storage::mark_sync_complete();
     });
 }
 

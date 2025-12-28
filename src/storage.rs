@@ -2,20 +2,30 @@ use serde::{Deserialize, Serialize};
 use crate::types::*;
 
 const PAUSED_WORKOUT_KEY: &str = "oxidize_paused_workout";
-const SYNC_COMPLETE_KEY: &str = "oxidize_sync_complete";
+const SYNC_STATUS_KEY: &str = "oxidize_sync_status";
 
-// Track whether we've synced from Supabase this session
-pub fn is_sync_complete() -> bool {
+// Sync status: "pending", "success", "failed"
+pub fn get_sync_status() -> &'static str {
     get_local_storage()
-        .and_then(|s| s.get_item(SYNC_COMPLETE_KEY).ok())
+        .and_then(|s| s.get_item(SYNC_STATUS_KEY).ok())
         .flatten()
-        .map(|v| v == "true")
-        .unwrap_or(false)
+        .map(|v| match v.as_str() {
+            "success" => "success",
+            "failed" => "failed",
+            _ => "pending"
+        })
+        .unwrap_or("pending")
 }
 
-pub fn mark_sync_complete() {
+pub fn mark_sync_success() {
     if let Some(storage) = get_local_storage() {
-        let _ = storage.set_item(SYNC_COMPLETE_KEY, "true");
+        let _ = storage.set_item(SYNC_STATUS_KEY, "success");
+    }
+}
+
+pub fn mark_sync_failed() {
+    if let Some(storage) = get_local_storage() {
+        let _ = storage.set_item(SYNC_STATUS_KEY, "failed");
     }
 }
 
