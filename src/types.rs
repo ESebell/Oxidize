@@ -85,13 +85,13 @@ pub struct WorkoutData {
     pub exercises: Vec<ExerciseWorkoutState>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ExerciseRecord {
     pub name: String,
     pub sets: Vec<SetRecord>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Session {
     pub id: String,
     pub routine: String,
@@ -101,7 +101,7 @@ pub struct Session {
     pub total_volume: f64,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
 pub struct ExerciseStats {
     pub name: String,
     pub current_weight: f64,

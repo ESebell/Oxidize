@@ -1011,11 +1011,14 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
     // Reactive bodyweight signal (Option<f64> - None means still loading)
     let (bodyweight, set_bodyweight) = create_signal(Option::<f64>::None);
     
+    // Reactive data version - increments when data should be reloaded
+    let (data_version, set_data_version) = create_signal(0u32);
+    
     // State for bodyweight input
     let (editing_weight, set_editing_weight) = create_signal(false);
     let (weight_input, set_weight_input) = create_signal(String::new());
     
-    // Poll sync status until complete, then load bodyweight
+    // Poll sync status until complete, then trigger data reload
     create_effect(move |_| {
         let status = sync_status.get();
         if status == "pending" {
@@ -1035,14 +1038,10 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
             let display_bw = Some(bw.unwrap_or(80.0));
             set_bodyweight.set(display_bw);
             set_weight_input.set(display_bw.map(|w| format!("{:.1}", w)).unwrap_or_default());
+            // Trigger UI refresh
+            set_data_version.update(|v| *v += 1);
         }
     });
-    
-    let db = storage::load_data();
-    // Use 80.0 for stats if not set
-    let summary = stats::get_stats_summary(&db, db.get_bodyweight().unwrap_or(80.0));
-    let power_history = stats::get_power_score_history(&db);
-    let all_stats = db.get_all_exercise_stats();
     
     let _user_email = auth.get().map(|a| a.user.email).unwrap_or_default();
     
@@ -1051,14 +1050,6 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
         set_auth.set(None);
         set_view.set(AppView::Login);
     };
-    // Get sessions from last 61 days (2 months), sorted by timestamp (newest first)
-    let now = chrono::Utc::now().timestamp();
-    let two_months_ago = now - (61 * 24 * 60 * 60);
-    let mut sessions: Vec<_> = db.sessions.iter()
-        .filter(|s| s.timestamp >= two_months_ago)
-        .cloned()
-        .collect();
-    sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
     
     let save_bodyweight = move |_| {
         if let Ok(w) = weight_input.get().parse::<f64>() {
@@ -1067,9 +1058,9 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
             set_weight_input.set(format!("{:.1}", w));
             
             // Save to local storage
-            let mut db = storage::load_data();
-            db.set_bodyweight(w);
-            let _ = storage::save_data(&db);
+            let mut local_db = storage::load_data();
+            local_db.set_bodyweight(w);
+            let _ = storage::save_data(&local_db);
             
             // Sync to cloud
             crate::supabase::save_bodyweight_to_cloud(w);
@@ -1077,24 +1068,25 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
         set_editing_weight.set(false);
     };
     
-    // Get progressive overload status for last session
-    let last_session = sessions.first().cloned();
-    let overload_statuses: Vec<(String, ProgressStatus)> = if let Some(ref session) = last_session {
-        session.exercises.iter()
-            .map(|e| {
-                let status = stats::check_progressive_overload(&db, &e.name, session);
-                (e.name.clone(), status)
-            })
-            .collect()
-    } else {
-        vec![]
+    // Helper to load fresh data - called in reactive closures
+    let load_sessions = move || {
+        let _ = data_version.get(); // Subscribe to changes
+        let db = storage::load_data();
+        let now = chrono::Utc::now().timestamp();
+        let two_months_ago = now - (61 * 24 * 60 * 60);
+        let mut sessions: Vec<_> = db.sessions.iter()
+            .filter(|s| s.timestamp >= two_months_ago)
+            .cloned()
+            .collect();
+        sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        sessions
     };
-    let overload_statuses_clone = overload_statuses.clone();
     
-    // E1RM for big 4
-    let big4_e1rm: Vec<(String, f64)> = BIG_FOUR.iter()
-        .map(|&name| (name.to_string(), *summary.e1rm_by_exercise.get(name).unwrap_or(&0.0)))
-        .collect();
+    let load_summary = move || {
+        let _ = data_version.get(); // Subscribe to changes
+        let db = storage::load_data();
+        stats::get_stats_summary(&db, db.get_bodyweight().unwrap_or(80.0))
+    };
 
     view! {
         <div class="stats">
@@ -1114,38 +1106,45 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                 // ═══════════════════════════════════════════════════════════════
                 <div class="stat-card hero-card">
                     <div class="hero-label">"POWER SCORE"</div>
-                    <div class="hero-value">{format!("{:.0}", summary.power_score)}<span class="hero-unit">" kg"</span></div>
+                    <div class="hero-value">{move || format!("{:.0}", load_summary().power_score)}<span class="hero-unit">" kg"</span></div>
                     <div class="hero-subtitle">"Summa E1RM (Big 4)"</div>
                     
                     // Big 4 breakdown
                     <div class="big4-grid">
-                        {big4_e1rm.iter().map(|(name, e1rm)| {
-                            let name = name.clone();
-                            let e1rm = *e1rm;
-                            view! {
-                                <div class="big4-item">
-                                    <span class="big4-name">{name}</span>
-                                    <span class="big4-value">{format!("{:.0}", e1rm)}</span>
-                                </div>
-                            }
-                        }).collect_view()}
+                        {move || {
+                            let s = load_summary();
+                            BIG_FOUR.iter().map(|&name| {
+                                let e1rm = *s.e1rm_by_exercise.get(name).unwrap_or(&0.0);
+                                view! {
+                                    <div class="big4-item">
+                                        <span class="big4-name">{name}</span>
+                                        <span class="big4-value">{format!("{:.0}", e1rm)}</span>
+                                    </div>
+                                }
+                            }).collect_view()
+                        }}
                     </div>
                     
                     // Mini trend chart
-                    {(!power_history.is_empty()).then(|| {
-                        let max = power_history.iter().map(|(_, v)| *v).fold(0.0, f64::max);
-                        let bars: Vec<f64> = power_history.iter()
-                            .rev().take(10).rev()
-                            .map(|(_, v)| if max > 0.0 { (v / max) * 100.0 } else { 0.0 })
-                            .collect();
-                        view! {
-                            <div class="power-chart">
-                                {bars.into_iter().map(|h| {
-                                    view! { <div class="power-bar" style=format!("height: {}%", h.max(8.0))></div> }
-                                }).collect_view()}
-                            </div>
-                        }
-                    })}
+                    {move || {
+                        let _ = data_version.get();
+                        let db = storage::load_data();
+                        let ph = stats::get_power_score_history(&db);
+                        (!ph.is_empty()).then(|| {
+                            let max = ph.iter().map(|(_, v)| *v).fold(0.0, f64::max);
+                            let bars: Vec<f64> = ph.iter()
+                                .rev().take(10).rev()
+                                .map(|(_, v)| if max > 0.0 { (v / max) * 100.0 } else { 0.0 })
+                                .collect();
+                            view! {
+                                <div class="power-chart">
+                                    {bars.into_iter().map(|h| {
+                                        view! { <div class="power-bar" style=format!("height: {}%", h.max(8.0))></div> }
+                                    }).collect_view()}
+                                </div>
+                            }
+                        })
+                    }}
                 </div>
                 
                 // ═══════════════════════════════════════════════════════════════
@@ -1158,7 +1157,7 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                             <span class="ptw-value">
                                 {move || {
                                     match bodyweight.get() {
-                                        Some(bw) if bw > 0.0 => format!("{:.2}", summary.power_score / bw),
+                                        Some(bw) if bw > 0.0 => format!("{:.2}", load_summary().power_score / bw),
                                         _ => "—".to_string()
                                     }
                                 }}
@@ -1213,7 +1212,7 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                     <div class="stat-card-title">"Effektivitet"</div>
                     <div class="efficiency-row">
                         <div class="efficiency-main">
-                            <span class="efficiency-value">{format!("{:.1}", summary.avg_efficiency)}</span>
+                            <span class="efficiency-value">{move || format!("{:.1}", load_summary().avg_efficiency)}</span>
                             <span class="efficiency-unit">"kg/min"</span>
                         </div>
                         <div class="efficiency-explain">
@@ -1221,61 +1220,79 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                         </div>
                     </div>
                     // Show last 5 sessions efficiency
-                    {(!sessions.is_empty()).then(|| {
-                        let eff_history: Vec<f64> = sessions.iter().take(5)
-                            .map(|s| stats::calculate_efficiency(s))
-                            .collect();
-                        let max = eff_history.iter().cloned().fold(0.0, f64::max);
-                        view! {
-                            <div class="efficiency-bars">
-                                {eff_history.into_iter().enumerate().map(|(i, e)| {
-                                    let pct = if max > 0.0 { (e / max) * 100.0 } else { 0.0 };
-                                    let is_latest = i == 0;
-                                    view! {
-                                        <div class="eff-bar-wrap">
-                                            <div 
-                                                class=if is_latest { "eff-bar latest" } else { "eff-bar" }
-                                                style=format!("height: {}%", pct.max(10.0))
-                                            ></div>
-                                            <span class="eff-label">{format!("{:.0}", e)}</span>
-                                        </div>
-                                    }
-                                }).collect_view()}
-                            </div>
-                        }
-                    })}
+                    {move || {
+                        let sess = load_sessions();
+                        (!sess.is_empty()).then(|| {
+                            let eff_history: Vec<f64> = sess.iter().take(5)
+                                .map(|s| stats::calculate_efficiency(s))
+                                .collect();
+                            let max = eff_history.iter().cloned().fold(0.0, f64::max);
+                            view! {
+                                <div class="efficiency-bars">
+                                    {eff_history.into_iter().enumerate().map(|(i, e)| {
+                                        let pct = if max > 0.0 { (e / max) * 100.0 } else { 0.0 };
+                                        let is_latest = i == 0;
+                                        view! {
+                                            <div class="eff-bar-wrap">
+                                                <div 
+                                                    class=if is_latest { "eff-bar latest" } else { "eff-bar" }
+                                                    style=format!("height: {}%", pct.max(10.0))
+                                                ></div>
+                                                <span class="eff-label">{format!("{:.0}", e)}</span>
+                                            </div>
+                                        }
+                                    }).collect_view()}
+                                </div>
+                            }
+                        })
+                    }}
                 </div>
                 
                 // ═══════════════════════════════════════════════════════════════
                 // 4. PROGRESSIVE OVERLOAD STREAK
                 // ═══════════════════════════════════════════════════════════════
-                {(!overload_statuses_clone.is_empty()).then(|| view! {
-                    <div class="stat-card">
-                        <div class="stat-card-title">"Senaste passet: Progression"</div>
-                        <div class="overload-grid">
-                            {overload_statuses_clone.iter().map(|(name, status)| {
-                                let class = match status {
-                                    ProgressStatus::Improved => "improved",
-                                    ProgressStatus::Maintained => "maintained",
-                                    ProgressStatus::Regressed => "regressed",
-                                    ProgressStatus::FirstTime => "first",
-                                };
-                                let name = name.clone();
-                                view! {
-                                    <div class=format!("overload-item {}", class)>
-                                        <span class="overload-icon"></span>
-                                        <span class="overload-name">{name}</span>
-                                    </div>
-                                }
-                            }).collect_view()}
+                {move || {
+                    let _ = data_version.get();
+                    let db = storage::load_data();
+                    let sess = load_sessions();
+                    let statuses: Vec<(String, ProgressStatus)> = if let Some(session) = sess.first() {
+                        session.exercises.iter()
+                            .map(|e| {
+                                let status = stats::check_progressive_overload(&db, &e.name, session);
+                                (e.name.clone(), status)
+                            })
+                            .collect()
+                    } else {
+                        vec![]
+                    };
+                    (!statuses.is_empty()).then(|| view! {
+                        <div class="stat-card">
+                            <div class="stat-card-title">"Senaste passet: Progression"</div>
+                            <div class="overload-grid">
+                                {statuses.iter().map(|(name, status)| {
+                                    let class = match status {
+                                        ProgressStatus::Improved => "improved",
+                                        ProgressStatus::Maintained => "maintained",
+                                        ProgressStatus::Regressed => "regressed",
+                                        ProgressStatus::FirstTime => "first",
+                                    };
+                                    let name = name.clone();
+                                    view! {
+                                        <div class=format!("overload-item {}", class)>
+                                            <span class="overload-icon"></span>
+                                            <span class="overload-name">{name}</span>
+                                        </div>
+                                    }
+                                }).collect_view()}
+                            </div>
+                            <div class="overload-legend">
+                                <span class="legend-item improved"><span class="legend-icon"></span>" Ökning"</span>
+                                <span class="legend-item maintained"><span class="legend-icon"></span>" Stabil"</span>
+                                <span class="legend-item regressed"><span class="legend-icon"></span>" Nedgång"</span>
+                            </div>
                         </div>
-                        <div class="overload-legend">
-                            <span class="legend-item improved"><span class="legend-icon"></span>" Ökning"</span>
-                            <span class="legend-item maintained"><span class="legend-icon"></span>" Stabil"</span>
-                            <span class="legend-item regressed"><span class="legend-icon"></span>" Nedgång"</span>
-                        </div>
-                    </div>
-                })}
+                    })
+                }}
                 
                 // ═══════════════════════════════════════════════════════════════
                 // 5. MUSCLE HEATMAP (7 dagar)
@@ -1284,28 +1301,31 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                 <div class="stat-card">
                     <div class="stat-card-title">"Muskelaktivitet (7 dagar)"</div>
                     <div class="heatmap-grid">
-                        {MuscleGroup::all().into_iter().map(|mg| {
-                            let score = *summary.muscle_frequency.get(&mg).unwrap_or(&0);
-                            // New thresholds for weighted scoring:
-                            // 0 = not trained
-                            // 1-8 = low (secondary muscle or skipped)
-                            // 9-17 = moderate (one exercise as primary)
-                            // 18-26 = good (multiple exercises)
-                            // 27+ = high
-                            let heat_class = match score {
-                                0 => "heat-0",
-                                1..=8 => "heat-1",
-                                9..=17 => "heat-2",
-                                18..=26 => "heat-3",
-                                _ => "heat-4",
-                            };
-                            view! {
-                                <div class=format!("heatmap-item {}", heat_class)>
-                                    <span class="heat-name">{mg.name()}</span>
-                                    <span class="heat-count">{score}</span>
-                                </div>
-                            }
-                        }).collect_view()}
+                        {move || {
+                            let s = load_summary();
+                            MuscleGroup::all().into_iter().map(|mg| {
+                                let score = *s.muscle_frequency.get(&mg).unwrap_or(&0);
+                                // New thresholds for weighted scoring:
+                                // 0 = not trained
+                                // 1-8 = low (secondary muscle or skipped)
+                                // 9-17 = moderate (one exercise as primary)
+                                // 18-26 = good (multiple exercises)
+                                // 27+ = high
+                                let heat_class = match score {
+                                    0 => "heat-0",
+                                    1..=8 => "heat-1",
+                                    9..=17 => "heat-2",
+                                    18..=26 => "heat-3",
+                                    _ => "heat-4",
+                                };
+                                view! {
+                                    <div class=format!("heatmap-item {}", heat_class)>
+                                        <span class="heat-name">{mg.name()}</span>
+                                        <span class="heat-count">{score}</span>
+                                    </div>
+                                }
+                            }).collect_view()
+                        }}
                     </div>
                     <div class="heat-legend">
                         <span class="heat-0">"Vila"</span>
@@ -1322,18 +1342,21 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                 <div class="stat-card">
                     <div class="stat-card-title">"Vilotider"</div>
                     <div class="rest-stat-main">
-                        <span class="rest-stat-value">{format_time(summary.avg_rest_time as i64)}</span>
+                        <span class="rest-stat-value">{move || format_time(load_summary().avg_rest_time as i64)}</span>
                         <span class="rest-stat-label">"snitt vila"</span>
                     </div>
                     <div class="rest-stat-explain">
-                        {if summary.avg_rest_time > 150.0 {
-                            "⚠️ Längre vila = starkare lyft men längre pass"
-                        } else if summary.avg_rest_time > 90.0 {
-                            "✓ Optimal vila för styrka"
-                        } else if summary.avg_rest_time > 45.0 {
-                            "⚡ Kort vila = mer kondition, mindre styrka"
-                        } else {
-                            "💨 Väldigt snabb – bra för fettförbränning!"
+                        {move || {
+                            let s = load_summary();
+                            if s.avg_rest_time > 150.0 {
+                                "⚠️ Längre vila = starkare lyft men längre pass"
+                            } else if s.avg_rest_time > 90.0 {
+                                "✓ Optimal vila för styrka"
+                            } else if s.avg_rest_time > 45.0 {
+                                "⚡ Kort vila = mer kondition, mindre styrka"
+                            } else {
+                                "💨 Väldigt snabb – bra för fettförbränning!"
+                            }
                         }}
                     </div>
                 </div>
@@ -1341,41 +1364,49 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                 // ═══════════════════════════════════════════════════════════════
                 // Exercise Details
                 // ═══════════════════════════════════════════════════════════════
-                {if all_stats.is_empty() {
-                    view! { <div class="empty-state">"Kör ditt första pass!"</div> }.into_view()
-                } else {
-                    view! {
-                        <div class="exercise-stats-section">
-                            <div class="section-title">"Övningar"</div>
-                            <div class="exercise-stats-grid">
-                                {all_stats.into_iter().map(|s| {
-                                    view! { <ExerciseStatsCard stats=s /> }
-                                }).collect_view()}
+                {move || {
+                    let _ = data_version.get();
+                    let db = storage::load_data();
+                    let all_ex_stats = db.get_all_exercise_stats();
+                    if all_ex_stats.is_empty() {
+                        view! { <div class="empty-state">"Kör ditt första pass!"</div> }.into_view()
+                    } else {
+                        view! {
+                            <div class="exercise-stats-section">
+                                <div class="section-title">"Övningar"</div>
+                                <div class="exercise-stats-grid">
+                                    {all_ex_stats.into_iter().map(|s| {
+                                        view! { <ExerciseStatsCard stats=s /> }
+                                    }).collect_view()}
+                                </div>
                             </div>
-                        </div>
-                    }.into_view()
+                        }.into_view()
+                    }
                 }}
                 
                 // ═══════════════════════════════════════════════════════════════
                 // History
                 // ═══════════════════════════════════════════════════════════════
-                {(!sessions.is_empty()).then(|| view! {
-                    <div class="stat-card">
-                        <div class="stat-card-title">"Historik"</div>
-                        {sessions.into_iter().map(|s| {
-                            let routine_class = if s.routine.contains("A") { "pass-a" } else { "pass-b" };
-                            let eff = stats::calculate_efficiency(&s);
-                            view! {
-                                <div class="history-item">
-                                    <span class=format!("history-routine {}", routine_class)>{&s.routine}</span>
-                                    <span class="history-date">{format_date(s.timestamp)}</span>
-                                    <span class="history-eff">{format!("{:.0} kg/min", eff)}</span>
-                                    <span class="history-duration">{format_time(s.duration_secs)}</span>
-                                </div>
-                            }
-                        }).collect_view()}
-                    </div>
-                })}
+                {move || {
+                    let sess = load_sessions();
+                    (!sess.is_empty()).then(|| view! {
+                        <div class="stat-card">
+                            <div class="stat-card-title">"Historik"</div>
+                            {sess.into_iter().map(|s| {
+                                let routine_class = if s.routine.contains("A") { "pass-a" } else { "pass-b" };
+                                let eff = stats::calculate_efficiency(&s);
+                                view! {
+                                    <div class="history-item">
+                                        <span class=format!("history-routine {}", routine_class)>{&s.routine}</span>
+                                        <span class="history-date">{format_date(s.timestamp)}</span>
+                                        <span class="history-eff">{format!("{:.0} kg/min", eff)}</span>
+                                        <span class="history-duration">{format_time(s.duration_secs)}</span>
+                                    </div>
+                                }
+                            }).collect_view()}
+                        </div>
+                    })
+                }}
             </div>
         </div>
     }

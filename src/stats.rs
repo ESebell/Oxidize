@@ -358,7 +358,7 @@ pub fn get_power_score_history(db: &Database) -> Vec<(i64, f64)> {
 }
 
 /// Comprehensive stats summary
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct StatsSummary {
     pub power_score: f64,
     pub power_to_weight: f64,
