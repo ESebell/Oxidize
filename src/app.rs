@@ -1171,7 +1171,7 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                             }}
                         </div>
                     </div>
-                    <div class="ptw-hint">"Power Score / kroppsvikt"</div>
+                    <div class="ptw-hint">"Total styrka (Big 4) delat med kroppsvikt"</div>
                 </div>
                 
                 // ═══════════════════════════════════════════════════════════════
