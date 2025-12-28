@@ -310,42 +310,9 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
         set_view.set(AppView::Workout(pending_routine.get()));
     };
 
-    // Check for sync failure
-    let (show_sync_warning, set_show_sync_warning) = create_signal(false);
-    let (failed_session_id, set_failed_session_id) = create_signal(String::new());
-    
-    // Poll for sync failure
-    {
-        use gloo_timers::callback::Interval;
-        let interval = Interval::new(1000, move || {
-            if let Some(session_id) = supabase::get_sync_failed_session() {
-                set_failed_session_id.set(session_id);
-                set_show_sync_warning.set(true);
-            }
-        });
-        leptos::on_cleanup(move || drop(interval));
-    }
-    
     view! {
         <div class="dashboard">
             <div class="logo">"OXIDIZE"</div>
-            
-            // Sync warning modal
-            {move || show_sync_warning.get().then(|| view! {
-                <div class="modal-overlay">
-                    <div class="sync-warning-dialog">
-                        <div class="sync-warning-icon">"⚠️"</div>
-                        <div class="sync-warning-title">"Kunde inte spara till molnet"</div>
-                        <div class="sync-warning-text">
-                            "Passet är sparat lokalt men kunde inte synkas till Supabase efter 3 försök. "
-                            "Rensa INTE webbläsarens cache förrän du har internetanslutning och appen har synkat."
-                        </div>
-                        <button class="sync-warning-btn" on:click=move |_| set_show_sync_warning.set(false)>
-                            "Jag förstår"
-                        </button>
-                    </div>
-                </div>
-            })}
             
             // Show loading indicator while syncing
             {move || is_loading.get().then(|| view! {
@@ -518,6 +485,8 @@ fn WorkoutActive(
     let (is_finished, set_is_finished) = create_signal(false);
     let (show_overview, set_show_overview) = create_signal(false);
     let (show_cancel_confirm, set_show_cancel_confirm) = create_signal(false);
+    let (is_saving, set_is_saving) = create_signal(false);
+    let (show_sync_warning, set_show_sync_warning) = create_signal(false);
     
     // Jump to specific exercise
     let jump_to_exercise = move |idx: usize| {
@@ -862,6 +831,25 @@ fn WorkoutActive(
                         );
                         view! {
                             <div class="finish-screen">
+                                // Sync warning modal
+                                {move || show_sync_warning.get().then(|| view! {
+                                    <div class="modal-overlay">
+                                        <div class="sync-warning-dialog">
+                                            <div class="sync-warning-icon">"⚠️"</div>
+                                            <div class="sync-warning-title">"Kunde inte spara till molnet"</div>
+                                            <div class="sync-warning-text">
+                                                "Passet är sparat lokalt men kunde inte synkas till Supabase efter 3 försök. "
+                                                "Rensa INTE webbläsarens cache förrän du har internetanslutning och appen har synkat."
+                                            </div>
+                                            <button class="sync-warning-btn" on:click=move |_| {
+                                                set_view.set(AppView::Dashboard);
+                                            }>
+                                                "Jag förstår"
+                                            </button>
+                                        </div>
+                                    </div>
+                                })}
+                                
                                 <div class="finish-icon">"✓"</div>
                                 <div class="finish-title">"Bra jobbat!"</div>
                                 <div class="finish-time">{format_time(elapsed.get())}</div>
@@ -869,21 +857,58 @@ fn WorkoutActive(
                                     <span class="finish-stat">{format!("{:.0} kg volym", total_volume)}</span>
                                     <span class="finish-stat">{format!("{} kcal", calories)}</span>
                                 </div>
-                                <button class="finish-save-btn" on:click=move |_| {
-                                    let exs = exercises.get();
-                                    let records: Vec<ExerciseRecord> = exs.iter()
-                                        .filter(|e| !e.sets_completed.is_empty())
-                                        .map(|e| ExerciseRecord {
-                                            name: e.exercise.name.clone(),
-                                            sets: e.sets_completed.clone(),
-                                        })
-                                        .collect();
-                                    storage::save_session(routine_name_sig.get(), records, elapsed.get());
-                                    set_view.set(AppView::Dashboard);
-                                }>
-                                    "Spara pass"
-                                </button>
-                                <a class="health-link" href={health_url} target="_blank">
+                                
+                                {move || if is_saving.get() {
+                                    view! {
+                                        <div class="saving-indicator">"Sparar..."</div>
+                                    }.into_view()
+                                } else {
+                                    view! {
+                                        <button class="finish-save-btn" on:click=move |_| {
+                                            set_is_saving.set(true);
+                                            
+                                            // Clear any previous sync failure flag
+                                            supabase::clear_sync_failed();
+                                            
+                                            let exs = exercises.get();
+                                            let records: Vec<ExerciseRecord> = exs.iter()
+                                                .filter(|e| !e.sets_completed.is_empty())
+                                                .map(|e| ExerciseRecord {
+                                                    name: e.exercise.name.clone(),
+                                                    sets: e.sets_completed.clone(),
+                                                })
+                                                .collect();
+                                            storage::save_session(routine_name_sig.get(), records, elapsed.get());
+                                            
+                                            // Poll for sync result (check every 500ms for up to 10 seconds)
+                                            use gloo_timers::callback::Interval;
+                                            let check_count = std::rc::Rc::new(std::cell::RefCell::new(0));
+                                            let check_count_clone = check_count.clone();
+                                            let interval = Interval::new(500, move || {
+                                                *check_count_clone.borrow_mut() += 1;
+                                                let count = *check_count_clone.borrow();
+                                                
+                                                // Check if sync failed
+                                                if supabase::get_sync_failed_session().is_some() {
+                                                    set_is_saving.set(false);
+                                                    set_show_sync_warning.set(true);
+                                                    return;
+                                                }
+                                                
+                                                // After ~5 seconds (10 checks), assume success and go to dashboard
+                                                // (retries take max ~3-4 sec, so 5 sec is safe)
+                                                if count >= 10 {
+                                                    set_view.set(AppView::Dashboard);
+                                                }
+                                            });
+                                            leptos::on_cleanup(move || drop(interval));
+                                        }>
+                                            "Spara pass"
+                                        </button>
+                                    }.into_view()
+                                }}
+                                
+                                <a class="health-link" href={health_url.clone()} target="_blank">
                                     "Logga till Health →"
                                 </a>
                             </div>

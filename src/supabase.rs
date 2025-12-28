@@ -265,6 +265,10 @@ fn clear_sync_failed_flag() {
     }
 }
 
+pub fn clear_sync_failed() {
+    clear_sync_failed_flag();
+}
+
 pub fn get_sync_failed_session() -> Option<String> {
     crate::storage::get_local_storage()
         .and_then(|s| s.get_item(SYNC_FAILED_KEY).ok())
