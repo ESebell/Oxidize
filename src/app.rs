@@ -13,12 +13,37 @@ fn format_time(secs: i64) -> String {
 }
 
 fn format_date(ts: i64) -> String {
-    let now = js_sys::Date::now() as i64 / 1000;
-    let diff = now - ts;
+    // Get current date in local timezone
+    let now_date = js_sys::Date::new_0();
+    let now_day = now_date.get_date();
+    let now_month = now_date.get_month();
+    let now_year = now_date.get_full_year();
     
-    if diff < 86400 { "Idag".to_string() }
-    else if diff < 172800 { "Igår".to_string() }
-    else { format!("{} dagar sedan", diff / 86400) }
+    // Get timestamp date in local timezone
+    let ts_date = js_sys::Date::new(&wasm_bindgen::JsValue::from_f64((ts * 1000) as f64));
+    let ts_day = ts_date.get_date();
+    let ts_month = ts_date.get_month();
+    let ts_year = ts_date.get_full_year();
+    
+    // Compare calendar dates
+    if ts_year == now_year && ts_month == now_month && ts_day == now_day {
+        "Idag".to_string()
+    } else {
+        // Check if it was yesterday
+        let yesterday = js_sys::Date::new(&wasm_bindgen::JsValue::from_f64(
+            js_sys::Date::now() - 86400.0 * 1000.0
+        ));
+        let yday = yesterday.get_date();
+        let ymonth = yesterday.get_month();
+        let yyear = yesterday.get_full_year();
+        
+        if ts_year == yyear && ts_month == ymonth && ts_day == yday {
+            "Igår".to_string()
+        } else {
+            let diff_days = ((js_sys::Date::now() / 1000.0) as i64 - ts) / 86400;
+            format!("{} dagar sedan", diff_days)
+        }
+    }
 }
 
 fn format_weight(w: f64) -> String {
