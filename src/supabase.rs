@@ -221,6 +221,8 @@ async fn save_session_async(session: &Session) -> Result<(), JsValue> {
     let window = web_sys::window().ok_or("no window")?;
     let user_id = get_current_user_id();
     
+    web_sys::console::log_1(&format!("Saving session {} with user_id: {:?}", session.id, user_id).into());
+    
     // Convert session to row format
     let exercises_json = serde_json::to_value(&session.exercises).map_err(|e| e.to_string())?;
     let row = SessionRow {
@@ -245,9 +247,15 @@ async fn save_session_async(session: &Session) -> Result<(), JsValue> {
     
     if !resp.ok() {
         let status = resp.status();
-        return Err(format!("HTTP error: {}", status).into());
+        // Get the actual error message from Supabase
+        let error_text = JsFuture::from(resp.text()?).await
+            .map(|v| v.as_string().unwrap_or_default())
+            .unwrap_or_default();
+        web_sys::console::log_1(&format!("Supabase error {}: {}", status, error_text).into());
+        return Err(format!("HTTP {}: {}", status, error_text).into());
     }
     
+    web_sys::console::log_1(&format!("Session {} saved successfully!", session.id).into());
     Ok(())
 }
 
@@ -444,44 +452,56 @@ pub fn sync_from_cloud() {
 }
 
 async fn do_sync() -> Result<(), JsValue> {
+    // Load local data first
+    let local_db = crate::storage::load_data();
+    
     // Fetch from cloud
     let cloud_sessions = fetch_sessions().await?;
     let cloud_weights = fetch_last_weights().await?;
     let (cloud_bodyweight, cloud_bw_history) = fetch_bodyweight().await.unwrap_or((None, vec![]));
     
-    // Load local data
-    let mut local_db = crate::storage::load_data();
+    // PUSH: Upload local sessions that aren't in cloud
+    let cloud_ids: std::collections::HashSet<_> = cloud_sessions.iter().map(|s| s.id.clone()).collect();
+    for session in &local_db.sessions {
+        if !cloud_ids.contains(&session.id) {
+            web_sys::console::log_1(&format!("Uploading missing session: {}", session.id).into());
+            if let Err(e) = save_session_async(session).await {
+                web_sys::console::log_1(&format!("Failed to upload session {}: {:?}", session.id, e).into());
+            }
+        }
+    }
     
-    // Merge sessions (add any from cloud that we don't have locally)
-    let local_ids: std::collections::HashSet<_> = local_db.sessions.iter().map(|s| s.id.clone()).collect();
+    // PULL: Merge sessions from cloud to local
+    let mut merged_db = local_db;
+    let local_ids: std::collections::HashSet<_> = merged_db.sessions.iter().map(|s| s.id.clone()).collect();
     for session in cloud_sessions {
         if !local_ids.contains(&session.id) {
-            local_db.sessions.push(session);
+            merged_db.sessions.push(session);
         }
     }
     
     // Merge weights (cloud takes precedence if newer data exists)
     for (name, data) in cloud_weights {
-        local_db.last_weights.insert(name, data);
+        merged_db.last_weights.insert(name, data);
     }
     
     // Merge bodyweight (use cloud if available)
     if let Some(bw) = cloud_bodyweight {
-        local_db.bodyweight = Some(bw);
+        merged_db.bodyweight = Some(bw);
     }
     
     // Merge bodyweight history
-    let local_bw_timestamps: std::collections::HashSet<_> = local_db.bodyweight_history.iter().map(|e| e.timestamp).collect();
+    let local_bw_timestamps: std::collections::HashSet<_> = merged_db.bodyweight_history.iter().map(|e| e.timestamp).collect();
     for entry in cloud_bw_history {
         if !local_bw_timestamps.contains(&entry.timestamp) {
-            local_db.bodyweight_history.push(entry);
+            merged_db.bodyweight_history.push(entry);
         }
     }
     // Sort by timestamp
-    local_db.bodyweight_history.sort_by_key(|e| e.timestamp);
+    merged_db.bodyweight_history.sort_by_key(|e| e.timestamp);
     
     // Save merged data locally
-    let _ = crate::storage::save_data(&local_db);
+    let _ = crate::storage::save_data(&merged_db);
     
     Ok(())
 }
