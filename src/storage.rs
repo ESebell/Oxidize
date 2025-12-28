@@ -29,6 +29,12 @@ pub fn mark_sync_failed() {
     }
 }
 
+pub fn reset_sync_status() {
+    if let Some(storage) = get_local_storage() {
+        let _ = storage.set_item(SYNC_STATUS_KEY, "pending");
+    }
+}
+
 // LocalStorage fallback for simpler key-value storage
 pub fn get_local_storage() -> Option<web_sys::Storage> {
     web_sys::window()?.local_storage().ok()?

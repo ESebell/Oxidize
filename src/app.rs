@@ -111,6 +111,9 @@ fn Login(set_view: WriteSignal<AppView>, set_auth: WriteSignal<Option<AuthSessio
             match supabase::sign_in(&email, &password).await {
                 Ok(session) => {
                     set_auth.set(Some(session));
+                    // Reset sync status and trigger new sync with user's credentials
+                    storage::reset_sync_status();
+                    supabase::sync_from_cloud();
                     set_view.set(AppView::Dashboard);
                 }
                 Err(e) => {
