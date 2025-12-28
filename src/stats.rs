@@ -206,6 +206,23 @@ pub fn get_muscle_groups_weighted(exercise: &str) -> Vec<(MuscleGroup, u32)> {
         "Hammercurls" => vec![
             (MuscleGroup::Biceps, 3),     // Primary (isolation)
         ],
+        // Finishers Pass A
+        "Shoulder Taps" => vec![
+            (MuscleGroup::Core, 3),       // Primary (stability)
+            (MuscleGroup::Shoulders, 1),  // Secondary
+        ],
+        "Mountain Climbers" => vec![
+            (MuscleGroup::Core, 3),       // Primary
+            (MuscleGroup::Quads, 1),      // Secondary
+        ],
+        // Finishers Pass B
+        "Dead Bug" => vec![
+            (MuscleGroup::Core, 3),       // Primary (stability)
+        ],
+        "Utfallssteg" => vec![
+            (MuscleGroup::Quads, 3),      // Primary
+            (MuscleGroup::Glutes, 3),     // Primary
+        ],
         _ => vec![],
     }
 }

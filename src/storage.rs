@@ -220,7 +220,10 @@ pub fn get_routine_a() -> Routine {
             Exercise::superset("Dips", 2, "AMRAP", "Leg Curls", None),
             Exercise::standard("Stående vadpress", 3, "12-15"),
         ],
-        finisher: "Sit-ups & Stretch".to_string(),
+        finishers: vec![
+            Exercise::finisher("Shoulder Taps", 3, "20"),
+            Exercise::finisher("Mountain Climbers", 3, "30s"),
+        ],
     }
 }
 
@@ -237,7 +240,10 @@ pub fn get_routine_b() -> Routine {
             Exercise::superset("Facepulls", 3, "15", "Sittande vadpress", None),
             Exercise::superset("Sittande vadpress", 3, "15-20", "Facepulls", None),
         ],
-        finisher: "Sit-ups & Stretch".to_string(),
+        finishers: vec![
+            Exercise::finisher("Dead Bug", 3, "12/sida"),
+            Exercise::finisher("Utfallssteg", 3, "20"),
+        ],
     }
 }
 
@@ -245,7 +251,9 @@ pub fn get_all_exercise_names() -> Vec<String> {
     let a = get_routine_a();
     let b = get_routine_b();
     let mut names: Vec<String> = a.exercises.iter().map(|e| e.name.clone()).collect();
+    names.extend(a.finishers.iter().map(|e| e.name.clone()));
     names.extend(b.exercises.iter().map(|e| e.name.clone()));
+    names.extend(b.finishers.iter().map(|e| e.name.clone()));
     names.sort();
     names.dedup();
     names
@@ -259,14 +267,25 @@ pub fn get_workout(routine_id: &str) -> Option<WorkoutData> {
         _ => return None,
     };
 
-    let exercises: Vec<ExerciseWorkoutState> = routine
+    // Combine main exercises and finishers
+    let all_exercises: Vec<&Exercise> = routine
         .exercises
+        .iter()
+        .chain(routine.finishers.iter())
+        .collect();
+
+    let exercises: Vec<ExerciseWorkoutState> = all_exercises
         .iter()
         .map(|ex| {
             let last_data = db.get_last_exercise_data(&ex.name);
-            let current_weight = last_data.as_ref().map(|d| d.weight).unwrap_or(20.0);
+            // Bodyweight exercises default to 0 weight
+            let current_weight = if ex.is_bodyweight {
+                0.0
+            } else {
+                last_data.as_ref().map(|d| d.weight).unwrap_or(20.0)
+            };
             ExerciseWorkoutState {
-                exercise: ex.clone(),
+                exercise: (*ex).clone(),
                 last_data,
                 current_weight,
                 sets_completed: Vec::new(),

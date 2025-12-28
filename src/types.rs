@@ -8,6 +8,7 @@ pub struct Exercise {
     pub is_superset: bool,
     pub superset_with: Option<String>,
     pub superset_name: Option<String>,
+    pub is_bodyweight: bool,
 }
 
 impl Exercise {
@@ -19,6 +20,7 @@ impl Exercise {
             is_superset: false,
             superset_with: None,
             superset_name: None,
+            is_bodyweight: false,
         }
     }
 
@@ -30,6 +32,19 @@ impl Exercise {
             is_superset: true,
             superset_with: Some(partner.to_string()),
             superset_name: ss_name.map(|s| s.to_string()),
+            is_bodyweight: false,
+        }
+    }
+    
+    pub fn finisher(name: &str, sets: u8, reps: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            sets,
+            reps_target: reps.to_string(),
+            is_superset: false,
+            superset_with: None,
+            superset_name: None,
+            is_bodyweight: true,
         }
     }
 }
@@ -61,7 +76,7 @@ pub struct Routine {
     pub name: String,
     pub focus: String,
     pub exercises: Vec<Exercise>,
-    pub finisher: String,
+    pub finishers: Vec<Exercise>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

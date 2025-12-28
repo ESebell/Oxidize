@@ -763,7 +763,7 @@ fn WorkoutActive(
                         let calories = (hours * bodyweight * met).round() as i64;
                         
                         let health_url = format!(
-                            "shortcuts://run-shortcut?name=Oxidize&input=text&text={}-{}",
+                            "shortcuts://run-shortcut?name=Oxidize&input=text&text={},{}",
                             duration_mins, calories
                         );
                         view! {
@@ -820,6 +820,7 @@ fn WorkoutActive(
                         let ex = current_exercise();
                         let ex_name = ex.as_ref().map(|e| e.exercise.name.clone()).unwrap_or_default();
                         let is_superset = ex.as_ref().map(|e| e.exercise.is_superset).unwrap_or(false);
+                        let is_bodyweight = ex.as_ref().map(|e| e.exercise.is_bodyweight).unwrap_or(false);
                         let ss_with = ex.as_ref().and_then(|e| e.exercise.superset_with.clone());
                         
                         view! {
@@ -836,22 +837,31 @@ fn WorkoutActive(
                                     </div>
                                 })}
                                 
+                                // Bodyweight badge for finishers
+                                {is_bodyweight.then(|| view! {
+                                    <div class="bodyweight-indicator">
+                                        "FINISHER"
+                                    </div>
+                                })}
+                                
                                 // Exercise name
                                 <div class="exercise-name-big">{ex_name}</div>
                                 
-                                // Weight with controls
-                                <div class="weight-section">
-                                    <button class="weight-adjust" on:click=move |_| adjust_weight(-2.5)>
-                                        "−"
-                                    </button>
-                                    <div class="weight-display-big">
-                                        <span class="weight-value">{move || format_weight(current_weight())}</span>
-                                        <span class="weight-unit">"kg"</span>
+                                // Weight with controls (hidden for bodyweight exercises)
+                                {(!is_bodyweight).then(|| view! {
+                                    <div class="weight-section">
+                                        <button class="weight-adjust" on:click=move |_| adjust_weight(-2.5)>
+                                            "−"
+                                        </button>
+                                        <div class="weight-display-big">
+                                            <span class="weight-value">{move || format_weight(current_weight())}</span>
+                                            <span class="weight-unit">"kg"</span>
+                                        </div>
+                                        <button class="weight-adjust" on:click=move |_| adjust_weight(2.5)>
+                                            "+"
+                                        </button>
                                     </div>
-                                    <button class="weight-adjust" on:click=move |_| adjust_weight(2.5)>
-                                        "+"
-                                    </button>
-                                </div>
+                                })}
                                 
                                 // Rep buttons - dynamically centered around target
                                 <div class="rep-label">"Tryck antal reps:"</div>

@@ -762,6 +762,17 @@ button {
     letter-spacing: 0.05em;
 }
 
+.bodyweight-indicator {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #ffa500;
+    background: rgba(255, 165, 0, 0.15);
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.15em;
+}
+
 .exercise-name-big {
     font-size: 1.75rem;
     font-weight: 700;
