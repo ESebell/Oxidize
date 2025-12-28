@@ -1051,13 +1051,14 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
         set_auth.set(None);
         set_view.set(AppView::Login);
     };
-    // Get sessions from last 61 days (2 months)
+    // Get sessions from last 61 days (2 months), sorted by timestamp (newest first)
     let now = chrono::Utc::now().timestamp();
     let two_months_ago = now - (61 * 24 * 60 * 60);
-    let sessions: Vec<_> = db.sessions.iter()
+    let mut sessions: Vec<_> = db.sessions.iter()
         .filter(|s| s.timestamp >= two_months_ago)
         .cloned()
         .collect();
+    sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
     
     let save_bodyweight = move |_| {
         if let Ok(w) = weight_input.get().parse::<f64>() {
