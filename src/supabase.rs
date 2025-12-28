@@ -458,9 +458,9 @@ pub fn sync_from_cloud() {
     });
 }
 
-/// Two-way sync: Push local changes to cloud, then pull cloud changes to local
+/// Cloud-first sync: Cloud is source of truth, local is just cache
 async fn do_sync() -> Result<(), JsValue> {
-    web_sys::console::log_1(&"Starting two-way sync...".into());
+    web_sys::console::log_1(&"Starting cloud-first sync...".into());
     
     // Only sync if logged in
     let user_id = match get_current_user_id() {
@@ -472,82 +472,36 @@ async fn do_sync() -> Result<(), JsValue> {
     };
     web_sys::console::log_1(&format!("Syncing for user: {}", user_id).into());
     
-    // Load local data
-    let local_db = crate::storage::load_data();
-    
     // ═══════════════════════════════════════════════════════════════
-    // PHASE 1: PUSH - Upload local data to cloud
+    // Fetch ALL data from cloud - cloud is source of truth
     // ═══════════════════════════════════════════════════════════════
-    
-    // Fetch current cloud state to know what needs uploading
-    let cloud_sessions = fetch_sessions().await.unwrap_or_default();
-    let cloud_ids: std::collections::HashSet<_> = cloud_sessions.iter().map(|s| s.id.clone()).collect();
-    
-    // Upload any local sessions not in cloud (using UPSERT for safety)
-    let mut upload_count = 0;
-    for session in &local_db.sessions {
-        if !cloud_ids.contains(&session.id) {
-            match upsert_session(session).await {
-                Ok(_) => {
-                    upload_count += 1;
-                    web_sys::console::log_1(&format!("↑ Uploaded session: {} ({})", session.routine, session.id).into());
-                }
-                Err(e) => {
-                    web_sys::console::log_1(&format!("✗ Failed to upload {}: {}", session.id, e).into());
-                }
-            }
-        }
-    }
-    if upload_count > 0 {
-        web_sys::console::log_1(&format!("Uploaded {} sessions to cloud", upload_count).into());
-    }
-    
-    // ═══════════════════════════════════════════════════════════════
-    // PHASE 2: PULL - Download cloud data to local
-    // ═══════════════════════════════════════════════════════════════
-    
-    // Re-fetch after uploads to get complete state
     let cloud_sessions = fetch_sessions().await.unwrap_or_default();
     let cloud_weights = fetch_last_weights().await.unwrap_or_default();
     let (cloud_bodyweight, cloud_bw_history) = fetch_bodyweight().await.unwrap_or((None, vec![]));
     
-    // Merge sessions: add cloud sessions we don't have locally
-    let mut merged_db = local_db;
-    let local_ids: std::collections::HashSet<_> = merged_db.sessions.iter().map(|s| s.id.clone()).collect();
-    let mut download_count = 0;
-    for session in cloud_sessions {
-        if !local_ids.contains(&session.id) {
-            web_sys::console::log_1(&format!("↓ Downloaded session: {} ({})", session.routine, session.id).into());
-            merged_db.sessions.push(session);
-            download_count += 1;
-        }
-    }
-    if download_count > 0 {
-        web_sys::console::log_1(&format!("Downloaded {} sessions from cloud", download_count).into());
-    }
+    web_sys::console::log_1(&format!("Cloud has {} sessions", cloud_sessions.len()).into());
     
-    // Merge weights (cloud takes precedence)
-    for (name, data) in cloud_weights {
-        merged_db.last_weights.insert(name, data);
-    }
+    // ═══════════════════════════════════════════════════════════════
+    // Replace local data with cloud data (cloud is truth)
+    // ═══════════════════════════════════════════════════════════════
+    let mut db = crate::storage::Database::default();
     
-    // Merge bodyweight
-    if let Some(bw) = cloud_bodyweight {
-        merged_db.bodyweight = Some(bw);
-    }
+    // Sessions: use cloud data directly
+    db.sessions = cloud_sessions;
     
-    // Merge bodyweight history (dedupe by timestamp)
-    let local_bw_timestamps: std::collections::HashSet<_> = merged_db.bodyweight_history.iter().map(|e| e.timestamp).collect();
-    for entry in cloud_bw_history {
-        if !local_bw_timestamps.contains(&entry.timestamp) {
-            merged_db.bodyweight_history.push(entry);
-        }
-    }
-    merged_db.bodyweight_history.sort_by_key(|e| e.timestamp);
+    // Weights: use cloud data
+    db.last_weights = cloud_weights;
     
-    // Save merged data locally
-    let _ = crate::storage::save_data(&merged_db);
+    // Bodyweight: use cloud data
+    db.bodyweight = cloud_bodyweight;
+    db.bodyweight_history = cloud_bw_history;
     
-    web_sys::console::log_1(&"✓ Sync complete".into());
+    // Sort sessions by timestamp (newest first for display)
+    db.sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    
+    // Save to local cache
+    let _ = crate::storage::save_data(&db);
+    
+    web_sys::console::log_1(&format!("✓ Sync complete: {} sessions cached locally", db.sessions.len()).into());
     Ok(())
 }
