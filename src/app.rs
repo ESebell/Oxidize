@@ -260,14 +260,28 @@ fn Register(set_view: WriteSignal<AppView>, set_auth: WriteSignal<Option<AuthSes
 
 #[component]
 fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>) -> impl IntoView {
-    // Reactive data that updates when sync completes
-    let data_version = create_memo(move |_| storage::get_data_version());
+    // Signal to trigger data reload
+    let (data_version, set_data_version) = create_signal(storage::get_data_version());
+    let (is_loading, set_is_loading) = create_signal(!storage::is_sync_complete());
+    
+    // Poll for sync completion
+    if !storage::is_sync_complete() {
+        use gloo_timers::callback::Interval;
+        let interval = Interval::new(200, move || {
+            if storage::is_sync_complete() {
+                set_is_loading.set(false);
+                set_data_version.set(storage::get_data_version());
+            }
+        });
+        // Keep interval alive but stop after 10 seconds max
+        leptos::on_cleanup(move || drop(interval));
+    }
     
     let stats = create_memo(move |_| {
-        let _ = data_version.get(); // Track version for reactivity
+        let _ = data_version.get();
         let db = storage::load_data();
         let total = db.get_total_stats();
-        let recent = db.get_recent_sessions(3);
+        let recent = db.get_recent_sessions(1); // Only 1 recent session
         (total, recent)
     });
     
@@ -275,8 +289,6 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
         let _ = data_version.get();
         storage::load_paused_workout()
     });
-    
-    let sync_complete = create_memo(move |_| storage::is_sync_complete());
     
     let user_email = auth.get().map(|a| a.user.email).unwrap_or_default();
     
@@ -303,7 +315,7 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
             <div class="logo">"OXIDIZE"</div>
             
             // Show loading indicator while syncing
-            {move || (!sync_complete.get()).then(|| view! {
+            {move || is_loading.get().then(|| view! {
                 <div class="sync-loading">"Laddar data..."</div>
             })}
             
