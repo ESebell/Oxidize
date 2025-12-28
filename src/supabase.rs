@@ -275,10 +275,33 @@ pub fn get_sync_failed_session() -> Option<String> {
         .flatten()
 }
 
+/// Fetch with timeout - returns Err if request takes longer than timeout_ms
+async fn fetch_with_timeout(request: Request, timeout_ms: u32) -> Result<Response, String> {
+    use futures::future::{select, Either};
+    use std::pin::pin;
+    
+    let window = web_sys::window().ok_or("no window")?;
+    let fetch_future = JsFuture::from(window.fetch_with_request(&request));
+    let timeout_future = gloo_timers::future::TimeoutFuture::new(timeout_ms);
+    
+    let fetch_pinned = pin!(fetch_future);
+    let timeout_pinned = pin!(timeout_future);
+    
+    match select(fetch_pinned, timeout_pinned).await {
+        Either::Left((result, _)) => {
+            let resp_value = result.map_err(|e| format!("{:?}", e))?;
+            resp_value.dyn_into().map_err(|_| "Invalid response".to_string())
+        }
+        Either::Right((_, _)) => {
+            Err(format!("Request timed out after {}ms", timeout_ms))
+        }
+    }
+}
+
 /// Upsert session to Supabase (insert or update if exists)
 /// This is idempotent - calling multiple times is safe
+/// Timeout: 5 seconds per request
 async fn upsert_session(session: &Session) -> Result<(), String> {
-    let window = web_sys::window().ok_or("no window")?;
     let user_id = get_current_user_id().ok_or("Not logged in")?;
     
     // Convert session to row format
@@ -303,8 +326,8 @@ async fn upsert_session(session: &Session) -> Result<(), String> {
     let url = format!("{}/rest/v1/sessions", SUPABASE_URL);
     let request = Request::new_with_str_and_init(&url, &opts).map_err(|e| format!("{:?}", e))?;
     
-    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await.map_err(|e| format!("{:?}", e))?;
-    let resp: Response = resp_value.dyn_into().map_err(|_| "Invalid response")?;
+    // 5 second timeout per request
+    let resp = fetch_with_timeout(request, 5000).await?;
     
     if !resp.ok() {
         let status = resp.status();
