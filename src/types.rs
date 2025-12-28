@@ -114,7 +114,7 @@ pub struct ExerciseStats {
     pub one_rm_trend: Vec<(i64, f64)>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
 pub struct TotalStats {
     pub total_sessions: usize,
     pub total_volume: f64,
@@ -144,7 +144,7 @@ pub struct AuthSession {
 }
 
 /// Paused workout state - saved when leaving mid-workout
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct PausedWorkout {
     pub routine_name: String,
     pub exercises: Vec<ExerciseWorkoutState>,

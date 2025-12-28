@@ -460,48 +460,54 @@ pub fn sync_from_cloud() {
 
 /// Cloud-first sync: Cloud is source of truth, local is just cache
 async fn do_sync() -> Result<(), JsValue> {
-    web_sys::console::log_1(&"Starting cloud-first sync...".into());
+    web_sys::console::log_1(&"═══════════════════════════════════════".into());
+    web_sys::console::log_1(&"SYNC START".into());
     
     // Only sync if logged in
     let user_id = match get_current_user_id() {
         Some(id) => id,
         None => {
-            web_sys::console::log_1(&"Sync skipped: not logged in".into());
+            web_sys::console::log_1(&"SYNC ABORTED: not logged in".into());
             return Ok(());
         }
     };
-    web_sys::console::log_1(&format!("Syncing for user: {}", user_id).into());
+    web_sys::console::log_1(&format!("User ID: {}", user_id).into());
     
-    // ═══════════════════════════════════════════════════════════════
-    // Fetch ALL data from cloud - cloud is source of truth
-    // ═══════════════════════════════════════════════════════════════
+    // Check what's in local storage BEFORE sync
+    let local_before = crate::storage::load_data();
+    web_sys::console::log_1(&format!("LOCAL BEFORE: {} sessions", local_before.sessions.len()).into());
+    
+    // Fetch from cloud
+    web_sys::console::log_1(&"Fetching from Supabase...".into());
     let cloud_sessions = fetch_sessions().await.unwrap_or_default();
     let cloud_weights = fetch_last_weights().await.unwrap_or_default();
     let (cloud_bodyweight, cloud_bw_history) = fetch_bodyweight().await.unwrap_or((None, vec![]));
     
-    web_sys::console::log_1(&format!("Cloud has {} sessions", cloud_sessions.len()).into());
+    web_sys::console::log_1(&format!("CLOUD: {} sessions", cloud_sessions.len()).into());
+    for s in &cloud_sessions {
+        web_sys::console::log_1(&format!("  - {} ({})", s.routine, s.id).into());
+    }
     
-    // ═══════════════════════════════════════════════════════════════
-    // Replace local data with cloud data (cloud is truth)
-    // ═══════════════════════════════════════════════════════════════
+    // Create fresh database with cloud data ONLY
     let mut db = crate::storage::Database::default();
-    
-    // Sessions: use cloud data directly
     db.sessions = cloud_sessions;
-    
-    // Weights: use cloud data
     db.last_weights = cloud_weights;
-    
-    // Bodyweight: use cloud data
     db.bodyweight = cloud_bodyweight;
     db.bodyweight_history = cloud_bw_history;
-    
-    // Sort sessions by timestamp (newest first for display)
     db.sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
     
-    // Save to local cache
-    let _ = crate::storage::save_data(&db);
+    // Save to localStorage - THIS REPLACES EVERYTHING
+    web_sys::console::log_1(&"Saving to localStorage...".into());
+    match crate::storage::save_data(&db) {
+        Ok(_) => web_sys::console::log_1(&"Save OK".into()),
+        Err(e) => web_sys::console::log_1(&format!("Save FAILED: {}", e).into()),
+    }
     
-    web_sys::console::log_1(&format!("✓ Sync complete: {} sessions cached locally", db.sessions.len()).into());
+    // Verify by re-loading
+    let local_after = crate::storage::load_data();
+    web_sys::console::log_1(&format!("LOCAL AFTER: {} sessions", local_after.sessions.len()).into());
+    
+    web_sys::console::log_1(&"SYNC COMPLETE".into());
+    web_sys::console::log_1(&"═══════════════════════════════════════".into());
     Ok(())
 }

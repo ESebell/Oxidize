@@ -3,6 +3,7 @@ use crate::types::*;
 
 const PAUSED_WORKOUT_KEY: &str = "oxidize_paused_workout";
 const SYNC_STATUS_KEY: &str = "oxidize_sync_status";
+const DATA_VERSION_KEY: &str = "oxidize_data_version";
 
 // Sync status: "pending", "success", "failed"
 pub fn get_sync_status() -> &'static str {
@@ -17,10 +18,30 @@ pub fn get_sync_status() -> &'static str {
         .unwrap_or("pending")
 }
 
+pub fn is_sync_complete() -> bool {
+    get_sync_status() == "success"
+}
+
+pub fn get_data_version() -> u32 {
+    get_local_storage()
+        .and_then(|s| s.get_item(DATA_VERSION_KEY).ok())
+        .flatten()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0)
+}
+
+pub fn increment_data_version() {
+    let new_version = get_data_version() + 1;
+    if let Some(storage) = get_local_storage() {
+        let _ = storage.set_item(DATA_VERSION_KEY, &new_version.to_string());
+    }
+}
+
 pub fn mark_sync_success() {
     if let Some(storage) = get_local_storage() {
         let _ = storage.set_item(SYNC_STATUS_KEY, "success");
     }
+    increment_data_version(); // Trigger UI refresh
 }
 
 pub fn mark_sync_failed() {

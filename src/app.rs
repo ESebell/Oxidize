@@ -260,10 +260,23 @@ fn Register(set_view: WriteSignal<AppView>, set_auth: WriteSignal<Option<AuthSes
 
 #[component]
 fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>) -> impl IntoView {
-    let db = storage::load_data();
-    let total = db.get_total_stats();
-    let recent = db.get_recent_sessions(3);
-    let paused = storage::load_paused_workout();
+    // Reactive data that updates when sync completes
+    let data_version = create_memo(move |_| storage::get_data_version());
+    
+    let stats = create_memo(move |_| {
+        let _ = data_version.get(); // Track version for reactivity
+        let db = storage::load_data();
+        let total = db.get_total_stats();
+        let recent = db.get_recent_sessions(3);
+        (total, recent)
+    });
+    
+    let paused = create_memo(move |_| {
+        let _ = data_version.get();
+        storage::load_paused_workout()
+    });
+    
+    let sync_complete = create_memo(move |_| storage::is_sync_complete());
     
     let user_email = auth.get().map(|a| a.user.email).unwrap_or_default();
     
@@ -289,19 +302,24 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
         <div class="dashboard">
             <div class="logo">"OXIDIZE"</div>
             
+            // Show loading indicator while syncing
+            {move || (!sync_complete.get()).then(|| view! {
+                <div class="sync-loading">"Laddar data..."</div>
+            })}
+            
             <div class="quick-stats">
                 <div class="quick-stat">
-                    <span class="quick-stat-value">{total.total_sessions}</span>
+                    <span class="quick-stat-value">{move || stats.get().0.total_sessions}</span>
                     <span class="quick-stat-label">"pass"</span>
                 </div>
                 <div class="quick-stat">
-                    <span class="quick-stat-value">{format!("{:.0}", total.total_volume / 1000.0)}</span>
+                    <span class="quick-stat-value">{move || format!("{:.0}", stats.get().0.total_volume / 1000.0)}</span>
                     <span class="quick-stat-label">"ton"</span>
                 </div>
             </div>
             
             // Paused workout banner
-            {paused.map(|p| {
+            {move || paused.get().map(|p| {
                 let routine_name = p.routine_name.clone();
                 let elapsed = format_time(p.elapsed_secs);
                 let exercises_done = p.exercises.iter().filter(|e| !e.sets_completed.is_empty()).count();
@@ -338,21 +356,24 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
                 <span class="start-btn-focus">"Rygg · Axlar · Biceps"</span>
             </button>
 
-            {(!recent.is_empty()).then(|| view! {
-                <div class="recent-sessions">
-                    <div class="recent-title">"Senaste"</div>
-                    {recent.into_iter().map(|s| {
-                        let routine_class = if s.routine.contains("A") { "pass-a" } else { "pass-b" };
-                        view! {
-                            <div class="recent-item">
-                                <span class=format!("recent-routine {}", routine_class)>{&s.routine}</span>
-                                <span class="recent-date">{format_date(s.timestamp)}</span>
-                                <span class="recent-duration">{format_time(s.duration_secs)}</span>
-                            </div>
-                        }
-                    }).collect_view()}
-                </div>
-            })}
+            {move || {
+                let recent = stats.get().1;
+                (!recent.is_empty()).then(|| view! {
+                    <div class="recent-sessions">
+                        <div class="recent-title">"Senaste"</div>
+                        {recent.into_iter().map(|s| {
+                            let routine_class = if s.routine.contains("A") { "pass-a" } else { "pass-b" };
+                            view! {
+                                <div class="recent-item">
+                                    <span class=format!("recent-routine {}", routine_class)>{&s.routine}</span>
+                                    <span class="recent-date">{format_date(s.timestamp)}</span>
+                                    <span class="recent-duration">{format_time(s.duration_secs)}</span>
+                                </div>
+                            }
+                        }).collect_view()}
+                    </div>
+                })
+            }}
             
             <button class="stats-link" on:click=move |_| set_view.set(AppView::Stats)>
                 "Statistik →"
