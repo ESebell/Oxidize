@@ -822,6 +822,8 @@ fn WorkoutActive(
                         let is_superset = ex.as_ref().map(|e| e.exercise.is_superset).unwrap_or(false);
                         let is_bodyweight = ex.as_ref().map(|e| e.exercise.is_bodyweight).unwrap_or(false);
                         let ss_with = ex.as_ref().and_then(|e| e.exercise.superset_with.clone());
+                        // Dumbbell exercises need a hint about weight logging
+                        let is_dumbbell = matches!(ex_name.as_str(), "Hammercurls" | "Sidolyft");
                         
                         view! {
                             <div class="exercise-screen">
@@ -846,6 +848,11 @@ fn WorkoutActive(
                                 
                                 // Exercise name
                                 <div class="exercise-name-big">{ex_name}</div>
+                                
+                                // Dumbbell hint
+                                {is_dumbbell.then(|| view! {
+                                    <div class="dumbbell-hint">"Lägg ihop båda hantlarnas vikt"</div>
+                                })}
                                 
                                 // Weight with controls (hidden for bodyweight exercises)
                                 {(!is_bodyweight).then(|| view! {

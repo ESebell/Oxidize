@@ -773,6 +773,14 @@ button {
     letter-spacing: 0.15em;
 }
 
+.dumbbell-hint {
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+    margin-top: 0.25rem;
+    margin-bottom: 0.5rem;
+    font-style: italic;
+}
+
 .exercise-name-big {
     font-size: 1.75rem;
     font-weight: 700;
