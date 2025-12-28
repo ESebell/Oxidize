@@ -1160,8 +1160,10 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                                     let bw_display = bw.map(|w| format!("{:.1}", w)).unwrap_or("--.-".to_string());
                                     view! {
                                         <button class="bw-display" on:click=move |_| {
-                                            let current = bodyweight.get().unwrap_or(80.0);
-                                            set_weight_input.set(format!("{:.1}", current));
+                                            let input_val = bodyweight.get()
+                                                .map(|w| format!("{:.1}", w))
+                                                .unwrap_or_default(); // Empty if not set
+                                            set_weight_input.set(input_val);
                                             set_editing_weight.set(true);
                                         }>
                                             <span class="bw-label">"Baserat på: "</span>
