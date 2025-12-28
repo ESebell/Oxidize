@@ -1085,7 +1085,7 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                 <div class="stat-card hero-card">
                     <div class="hero-label">"POWER SCORE"</div>
                     <div class="hero-value">{format!("{:.0}", summary.power_score)}<span class="hero-unit">" kg"</span></div>
-                    <div class="hero-subtitle">"Summa E1RM (De fyra stora)"</div>
+                    <div class="hero-subtitle">"Summa E1RM (Big 4)"</div>
                     
                     // Big 4 breakdown
                     <div class="big4-grid">
@@ -1171,7 +1171,7 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                             }}
                         </div>
                     </div>
-                    <div class="ptw-hint">"Total styrka (Big 4) delat med kroppsvikt"</div>
+                    <div class="ptw-hint">"Power Score / kroppsvikt"</div>
                 </div>
                 
                 // ═══════════════════════════════════════════════════════════════
