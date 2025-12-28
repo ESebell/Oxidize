@@ -773,7 +773,7 @@ button {
     letter-spacing: 0.15em;
 }
 
-.dumbbell-hint {
+.exercise-hint {
     font-size: 0.75rem;
     color: var(--fg-muted);
     margin-top: 0.25rem;
