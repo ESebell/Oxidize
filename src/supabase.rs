@@ -387,10 +387,13 @@ async fn save_weight_async(exercise_name: &str, weight: f64, reps: u8) -> Result
 pub async fn fetch_sessions() -> Result<Vec<Session>, JsValue> {
     let window = web_sys::window().ok_or("no window")?;
     
+    // Only fetch sessions for current user
+    let user_id = get_current_user_id().ok_or("Not logged in")?;
+    
     let headers = get_headers()?;
     let opts = create_request_init("GET", None, &headers);
     
-    let url = format!("{}/rest/v1/sessions?select=*", SUPABASE_URL);
+    let url = format!("{}/rest/v1/sessions?select=*&user_id=eq.{}", SUPABASE_URL, user_id);
     let request = Request::new_with_str_and_init(&url, &opts)?;
     
     let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
@@ -423,10 +426,13 @@ pub async fn fetch_sessions() -> Result<Vec<Session>, JsValue> {
 pub async fn fetch_last_weights() -> Result<std::collections::HashMap<String, crate::types::LastExerciseData>, JsValue> {
     let window = web_sys::window().ok_or("no window")?;
     
+    // Only fetch weights for current user
+    let user_id = get_current_user_id().ok_or("Not logged in")?;
+    
     let headers = get_headers()?;
     let opts = create_request_init("GET", None, &headers);
     
-    let url = format!("{}/rest/v1/last_weights?select=*", SUPABASE_URL);
+    let url = format!("{}/rest/v1/last_weights?select=*&user_id=eq.{}", SUPABASE_URL, user_id);
     let request = Request::new_with_str_and_init(&url, &opts)?;
     
     let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
@@ -490,10 +496,13 @@ async fn save_bodyweight_async(weight: f64) -> Result<(), JsValue> {
 pub async fn fetch_bodyweight() -> Result<(Option<f64>, Vec<crate::storage::BodyweightEntry>), JsValue> {
     let window = web_sys::window().ok_or("no window")?;
     
+    // Only fetch bodyweight for current user
+    let user_id = get_current_user_id().ok_or("Not logged in")?;
+    
     let headers = get_headers()?;
     let opts = create_request_init("GET", None, &headers);
     
-    let url = format!("{}/rest/v1/bodyweight?select=*&order=timestamp.desc", SUPABASE_URL);
+    let url = format!("{}/rest/v1/bodyweight?select=*&user_id=eq.{}&order=timestamp.desc", SUPABASE_URL, user_id);
     let request = Request::new_with_str_and_init(&url, &opts)?;
     
     let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
