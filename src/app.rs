@@ -1073,7 +1073,7 @@ fn WorkoutActive(
                                                 <div class="timer-selector">
                                                     <div class="timer-label">"Välj tid:"</div>
                                                     <div class="duration-buttons">
-                                                        {[15u32, 20, 25, 30, 35, 40, 45].into_iter().map(|d| {
+                                                        {[20u32, 25, 30, 35, 40, 45, 50, 55].into_iter().map(|d| {
                                                             let is_target = d == target_duration;
                                                             let is_last = last_duration == Some(d);
                                                             let btn_class = move || {
