@@ -75,8 +75,8 @@ impl Database {
         });
     }
     
-    pub fn get_bodyweight(&self) -> f64 {
-        self.bodyweight.unwrap_or(80.0) // Default 80kg
+    pub fn get_bodyweight(&self) -> Option<f64> {
+        self.bodyweight
     }
 }
 

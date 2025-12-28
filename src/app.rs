@@ -433,9 +433,9 @@ fn WorkoutActive(
     let routine_name_pause = routine_name.clone();
     let is_pass_a = routine_name.contains("A");
     
-    // Load bodyweight for calorie calculation
+    // Load bodyweight for calorie calculation (use default if not set)
     let db = storage::load_data();
-    let bodyweight = db.get_bodyweight();
+    let bodyweight = db.get_bodyweight().unwrap_or(80.0);
     
     // State
     let total_exercises = data.exercises.len();
@@ -1004,11 +1004,12 @@ fn WorkoutActive(
 fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, set_auth: WriteSignal<Option<AuthSession>>) -> impl IntoView {
     let db = storage::load_data();
     let initial_bodyweight = db.get_bodyweight();
-    let summary = stats::get_stats_summary(&db, initial_bodyweight);
+    // Use 0.0 for stats summary if no bodyweight set (will show "--" in UI)
+    let summary = stats::get_stats_summary(&db, initial_bodyweight.unwrap_or(0.0));
     let power_history = stats::get_power_score_history(&db);
     let all_stats = db.get_all_exercise_stats();
     
-    let user_email = auth.get().map(|a| a.user.email).unwrap_or_default();
+    let _user_email = auth.get().map(|a| a.user.email).unwrap_or_default();
     
     let do_logout = move |_| {
         supabase::sign_out();
@@ -1023,17 +1024,19 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
         .cloned()
         .collect();
     
-    // Reactive bodyweight signal
+    // Reactive bodyweight signal (Option<f64> - None means not set)
     let (bodyweight, set_bodyweight) = create_signal(initial_bodyweight);
     
     // State for bodyweight input
     let (editing_weight, set_editing_weight) = create_signal(false);
-    let (weight_input, set_weight_input) = create_signal(format!("{:.1}", initial_bodyweight));
+    let (weight_input, set_weight_input) = create_signal(
+        initial_bodyweight.map(|w| format!("{:.1}", w)).unwrap_or_default()
+    );
     
     let save_bodyweight = move |_| {
         if let Ok(w) = weight_input.get().parse::<f64>() {
             // Update reactive signal (updates UI immediately)
-            set_bodyweight.set(w);
+            set_bodyweight.set(Some(w));
             set_weight_input.set(format!("{:.1}", w));
             
             // Save to local storage
@@ -1127,11 +1130,9 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                         <div class="ptw-main">
                             <span class="ptw-value">
                                 {move || {
-                                    let bw = bodyweight.get();
-                                    if bw > 0.0 {
-                                        format!("{:.2}", summary.power_score / bw)
-                                    } else {
-                                        "—".to_string()
+                                    match bodyweight.get() {
+                                        Some(bw) if bw > 0.0 => format!("{:.2}", summary.power_score / bw),
+                                        _ => "—".to_string()
                                     }
                                 }}
                             </span>
@@ -1156,13 +1157,15 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                                     }.into_view()
                                 } else {
                                     let bw = bodyweight.get();
+                                    let bw_display = bw.map(|w| format!("{:.1}", w)).unwrap_or("--.-".to_string());
                                     view! {
                                         <button class="bw-display" on:click=move |_| {
-                                            set_weight_input.set(format!("{:.1}", bodyweight.get()));
+                                            let current = bodyweight.get().unwrap_or(80.0);
+                                            set_weight_input.set(format!("{:.1}", current));
                                             set_editing_weight.set(true);
                                         }>
                                             <span class="bw-label">"Baserat på: "</span>
-                                            <span class="bw-value">{format!("{:.1}", bw)}</span>
+                                            <span class="bw-value">{bw_display}</span>
                                             <span class="bw-kg">" kg"</span>
                                             <span class="bw-edit-icon">" ✎"</span>
                                         </button>
