@@ -310,9 +310,42 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
         set_view.set(AppView::Workout(pending_routine.get()));
     };
 
+    // Check for sync failure
+    let (show_sync_warning, set_show_sync_warning) = create_signal(false);
+    let (failed_session_id, set_failed_session_id) = create_signal(String::new());
+    
+    // Poll for sync failure
+    {
+        use gloo_timers::callback::Interval;
+        let interval = Interval::new(1000, move || {
+            if let Some(session_id) = supabase::get_sync_failed_session() {
+                set_failed_session_id.set(session_id);
+                set_show_sync_warning.set(true);
+            }
+        });
+        leptos::on_cleanup(move || drop(interval));
+    }
+    
     view! {
         <div class="dashboard">
             <div class="logo">"OXIDIZE"</div>
+            
+            // Sync warning modal
+            {move || show_sync_warning.get().then(|| view! {
+                <div class="modal-overlay">
+                    <div class="sync-warning-dialog">
+                        <div class="sync-warning-icon">"⚠️"</div>
+                        <div class="sync-warning-title">"Kunde inte spara till molnet"</div>
+                        <div class="sync-warning-text">
+                            "Passet är sparat lokalt men kunde inte synkas till Supabase efter 3 försök. "
+                            "Rensa INTE webbläsarens cache förrän du har internetanslutning och appen har synkat."
+                        </div>
+                        <button class="sync-warning-btn" on:click=move |_| set_show_sync_warning.set(false)>
+                            "Jag förstår"
+                        </button>
+                    </div>
+                </div>
+            })}
             
             // Show loading indicator while syncing
             {move || is_loading.get().then(|| view! {

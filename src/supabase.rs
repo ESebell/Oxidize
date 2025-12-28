@@ -207,6 +207,9 @@ fn create_request_init(method: &str, body: Option<&str>, headers: &Headers) -> R
 
 /// Save session to Supabase with proper error handling
 /// Uses UPSERT to be idempotent - safe to call multiple times
+/// Save session to cloud with retry logic (3 attempts)
+/// Returns immediately, runs async in background
+/// Sets SYNC_FAILED flag if all retries fail
 pub fn save_session_to_cloud(session: &Session) {
     // Don't try to save if not logged in - RLS will block it anyway
     if get_current_user_id().is_none() {
@@ -216,11 +219,56 @@ pub fn save_session_to_cloud(session: &Session) {
     
     let session = session.clone();
     wasm_bindgen_futures::spawn_local(async move {
-        match upsert_session(&session).await {
-            Ok(_) => web_sys::console::log_1(&format!("✓ Session {} saved to cloud", session.id).into()),
-            Err(e) => web_sys::console::log_1(&format!("✗ Session {} save failed: {:?}", session.id, e).into()),
+        let max_retries = 3;
+        let mut last_error = String::new();
+        
+        for attempt in 1..=max_retries {
+            web_sys::console::log_1(&format!("☁️ Saving session {} (attempt {}/{})", session.id, attempt, max_retries).into());
+            
+            match upsert_session(&session).await {
+                Ok(_) => {
+                    web_sys::console::log_1(&format!("✓ Session {} saved to cloud", session.id).into());
+                    clear_sync_failed_flag();
+                    return; // Success!
+                }
+                Err(e) => {
+                    last_error = e;
+                    web_sys::console::log_1(&format!("✗ Attempt {} failed: {}", attempt, last_error).into());
+                    
+                    if attempt < max_retries {
+                        // Wait before retry: 1s, 2s
+                        let delay_ms = attempt * 1000;
+                        gloo_timers::future::TimeoutFuture::new(delay_ms as u32).await;
+                    }
+                }
+            }
         }
+        
+        // All retries failed
+        web_sys::console::log_1(&format!("❌ Session {} save FAILED after {} retries: {}", session.id, max_retries, last_error).into());
+        set_sync_failed_flag(&session.id);
     });
+}
+
+// Sync failure tracking
+const SYNC_FAILED_KEY: &str = "oxidize_sync_failed";
+
+fn set_sync_failed_flag(session_id: &str) {
+    if let Some(storage) = crate::storage::get_local_storage() {
+        let _ = storage.set_item(SYNC_FAILED_KEY, session_id);
+    }
+}
+
+fn clear_sync_failed_flag() {
+    if let Some(storage) = crate::storage::get_local_storage() {
+        let _ = storage.remove_item(SYNC_FAILED_KEY);
+    }
+}
+
+pub fn get_sync_failed_session() -> Option<String> {
+    crate::storage::get_local_storage()
+        .and_then(|s| s.get_item(SYNC_FAILED_KEY).ok())
+        .flatten()
 }
 
 /// Upsert session to Supabase (insert or update if exists)
@@ -484,11 +532,43 @@ async fn do_sync() -> Result<(), JsValue> {
     let (cloud_bodyweight, cloud_bw_history) = fetch_bodyweight().await.unwrap_or((None, vec![]));
     
     web_sys::console::log_1(&format!("CLOUD: {} sessions", cloud_sessions.len()).into());
+    
+    // PHASE 1: PUSH - Upload local sessions missing from cloud
+    let cloud_ids: std::collections::HashSet<String> = cloud_sessions.iter().map(|s| s.id.clone()).collect();
+    let mut pushed_count = 0;
+    
+    for local_session in &local_before.sessions {
+        if !cloud_ids.contains(&local_session.id) {
+            web_sys::console::log_1(&format!("📤 Pushing local session: {} ({})", local_session.routine, local_session.id).into());
+            match upsert_session(local_session).await {
+                Ok(_) => {
+                    web_sys::console::log_1(&format!("  ✓ Pushed successfully").into());
+                    pushed_count += 1;
+                }
+                Err(e) => {
+                    web_sys::console::log_1(&format!("  ✗ Push failed: {}", e).into());
+                }
+            }
+        }
+    }
+    
+    if pushed_count > 0 {
+        web_sys::console::log_1(&format!("📤 Pushed {} local sessions to cloud", pushed_count).into());
+    }
+    
+    // PHASE 2: PULL - Fetch cloud data again (in case we just pushed something)
+    let cloud_sessions = if pushed_count > 0 {
+        fetch_sessions().await.unwrap_or_default()
+    } else {
+        cloud_sessions
+    };
+    
+    web_sys::console::log_1(&format!("CLOUD FINAL: {} sessions", cloud_sessions.len()).into());
     for s in &cloud_sessions {
         web_sys::console::log_1(&format!("  - {} ({})", s.routine, s.id).into());
     }
     
-    // Create fresh database with cloud data ONLY
+    // Create fresh database with cloud data
     let mut db = crate::storage::Database::default();
     db.sessions = cloud_sessions;
     db.last_weights = cloud_weights;
@@ -496,7 +576,7 @@ async fn do_sync() -> Result<(), JsValue> {
     db.bodyweight_history = cloud_bw_history;
     db.sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
     
-    // Save to localStorage - THIS REPLACES EVERYTHING
+    // Save to localStorage
     web_sys::console::log_1(&"Saving to localStorage...".into());
     match crate::storage::save_data(&db) {
         Ok(_) => web_sys::console::log_1(&"Save OK".into()),
