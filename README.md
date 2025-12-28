@@ -18,6 +18,39 @@
 - **Storage**: localStorage + Supabase
 - **Hosting**: GitHub Pages
 
+## Ändra träningspass
+
+Passen definieras i `routines.json`. Så här gör du för att ändra:
+
+1. **Redigera `routines.json`** - lägg till/ta bort/ändra övningar
+2. **Be AI:n synka** - skriv "synka storage.rs med routines.json"
+3. **Klar!** - Rust-koden uppdateras automatiskt
+
+### Övningstyper
+
+```json
+// Standard övning
+{ "name": "Knäböj", "sets": 3, "reps_target": "5-8", "type": "standard" }
+
+// Superset (två övningar som alternerar)
+{
+  "type": "superset",
+  "pair": [
+    { "name": "Leg Curls", "sets": 2, "reps_target": "12-15" },
+    { "name": "Dips", "sets": 2, "reps_target": "AMRAP" }
+  ]
+}
+
+// Finisher (bodyweight, visas sist)
+{ "name": "Shoulder Taps", "sets": 3, "reps_target": "20", "is_bodyweight": true }
+```
+
+### Hints (tips som visas i appen)
+
+```json
+{ "name": "Hammercurls", "sets": 3, "reps_target": "10-12", "hint": "Lägg ihop båda hantlarnas vikt" }
+```
+
 ## Development
 
 ```bash
@@ -30,6 +63,13 @@ trunk serve
 
 # Build for production
 trunk build
+```
+
+## Deploya till GitHub Pages
+
+```bash
+trunk build --release
+# Kopiera assets och pusha till gh-pages branch
 ```
 
 ## License

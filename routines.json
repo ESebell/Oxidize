@@ -1,69 +1,70 @@
 {
+  "app_name": "Oxidize",
+  "description": "Ändra passen i src/storage.rs - get_routine_a() och get_routine_b()",
+  
   "routines": [
     {
-      "id": "A",
       "name": "Pass A",
       "focus": "Ben, Press & Triceps",
-      "finisher": "Sit-ups & Stretch",
       "exercises": [
-        { "name": "Knäböj", "sets": 3, "reps": "5-8" },
-        { "name": "Bänkpress", "sets": 3, "reps": "5-8" },
-        { "name": "Hip Thrusts", "sets": 3, "reps": "8-12" },
-        { "name": "Latsdrag", "sets": 3, "reps": "8-10" },
-        { 
-          "name": "Leg Curls", 
-          "sets": 2, 
-          "reps": "12-15",
-          "superset_with": "Dips"
+        { "name": "Knäböj", "sets": 3, "reps_target": "5-8", "type": "standard" },
+        { "name": "Bänkpress", "sets": 3, "reps_target": "5-8", "type": "standard" },
+        { "name": "Hip Thrusts", "sets": 3, "reps_target": "8-12", "type": "standard" },
+        { "name": "Latsdrag", "sets": 3, "reps_target": "8-10", "type": "standard" },
+        {
+          "type": "superset",
+          "note": "Alternerar: Leg Curls set 1 → Dips set 1 → Leg Curls set 2 → ...",
+          "pair": [
+            { "name": "Leg Curls", "sets": 2, "reps_target": "12-15" },
+            { "name": "Dips", "sets": 2, "reps_target": "AMRAP" }
+          ]
         },
-        { 
-          "name": "Dips", 
-          "sets": 2, 
-          "reps": "AMRAP",
-          "superset_with": "Leg Curls"
-        },
-        { "name": "Stående vadpress", "sets": 3, "reps": "12-15" }
+        { "name": "Stående vadpress", "sets": 3, "reps_target": "12-15", "type": "standard" }
+      ],
+      "finishers": [
+        { "name": "Shoulder Taps", "sets": 3, "reps_target": "20", "is_bodyweight": true },
+        { "name": "Mountain Climbers", "sets": 3, "reps_target": "30s", "is_bodyweight": true }
       ]
     },
     {
-      "id": "B",
       "name": "Pass B",
       "focus": "Rygg, Axlar & Biceps",
-      "finisher": "Sit-ups & Stretch",
       "exercises": [
-        { "name": "Marklyft", "sets": 3, "reps": "5" },
-        { "name": "Militärpress", "sets": 3, "reps": "8-10" },
-        { "name": "Sittande rodd", "sets": 3, "reps": "10-12" },
-        { 
-          "name": "Sidolyft", 
-          "sets": 3, 
-          "reps": "12-15",
-          "superset_with": "Facepulls",
-          "superset_name": "Axel-fokus"
+        { "name": "Marklyft", "sets": 3, "reps_target": "5", "type": "standard" },
+        { "name": "Militärpress", "sets": 3, "reps_target": "8-10", "type": "standard" },
+        { "name": "Sittande rodd", "sets": 3, "reps_target": "10-12", "type": "standard" },
+        {
+          "type": "superset",
+          "note": "Alternerar: Sidolyft set 1 → Hammercurls set 1 → ...",
+          "pair": [
+            { "name": "Sidolyft", "sets": 3, "reps_target": "12-15", "hint": "Lägg ihop båda hantlarnas vikt" },
+            { "name": "Hammercurls", "sets": 3, "reps_target": "10-12", "hint": "Lägg ihop båda hantlarnas vikt" }
+          ]
         },
-        { 
-          "name": "Facepulls", 
-          "sets": 3, 
-          "reps": "15",
-          "superset_with": "Sidolyft",
-          "superset_name": "Axel-fokus"
-        },
-        { 
-          "name": "Hammercurls", 
-          "sets": 3, 
-          "reps": "10-12",
-          "superset_with": "Sittande vadpress",
-          "superset_name": "Armar/Vader"
-        },
-        { 
-          "name": "Sittande vadpress", 
-          "sets": 3, 
-          "reps": "15-20",
-          "superset_with": "Hammercurls",
-          "superset_name": "Armar/Vader"
+        {
+          "type": "superset",
+          "note": "Alternerar: Facepulls set 1 → Sittande vadpress set 1 → ...",
+          "pair": [
+            { "name": "Facepulls", "sets": 3, "reps_target": "15" },
+            { "name": "Sittande vadpress", "sets": 3, "reps_target": "15-20" }
+          ]
         }
+      ],
+      "finishers": [
+        { "name": "Dead Bug", "sets": 3, "reps_target": "12/sida", "is_bodyweight": true, "hint": "Totalt antal reps (båda sidor)" },
+        { "name": "Utfallssteg", "sets": 3, "reps_target": "20", "is_bodyweight": true, "hint": "Totalt antal reps (båda sidor)" }
       ]
     }
-  ]
-}
+  ],
 
+  "code_reference": {
+    "file": "src/storage.rs",
+    "functions": ["get_routine_a()", "get_routine_b()"],
+    "exercise_types": {
+      "standard": "Exercise::standard(\"Namn\", sets, \"reps\")",
+      "superset": "Exercise::superset(\"Namn\", sets, \"reps\", \"PartnerNamn\", None)",
+      "finisher": "Exercise::finisher(\"Namn\", sets, \"reps\")"
+    },
+    "example": "Exercise::standard(\"Knäböj\", 3, \"5-8\")"
+  }
+}
