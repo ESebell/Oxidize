@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oxidize-v31';
+const CACHE_NAME = 'oxidize-v33';
 
 // Install: skip waiting to activate immediately
 self.addEventListener('install', event => {

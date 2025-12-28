@@ -1112,47 +1112,49 @@ fn WorkoutActive(
                                 
                                 // REP-BASED EXERCISE UI (not timed)
                                 {(!is_timed).then(|| view! {
-                                    <div class="rep-section">
-                                        <div class="rep-label">"Tryck antal reps:"</div>
-                                        <div class="rep-buttons">
-                                            {move || {
-                                                let ex = current_exercise();
-                                                let (min, max) = ex.as_ref()
-                                                    .map(|e| parse_target_range(&e.exercise.reps_target))
-                                                    .unwrap_or((5, 8));
-                                                let last_reps = ex.as_ref()
-                                                    .and_then(|e| e.last_data.as_ref())
-                                                    .map(|d| d.reps);
-                                                
-                                                // Center the 12-button grid around the target
-                                                let center = (min + max) / 2;
-                                                let start = (center as i32 - 5).max(1) as u8;
-                                                let end = start + 11; // 12 buttons total
-                                                
-                                                (start..=end).map(|r| {
-                                                    let is_last = last_reps == Some(r);
-                                                    let is_target = r >= min && r <= max;
-                                                    let btn_class = if is_last { 
-                                                        "rep-button last" 
-                                                    } else if is_target { 
-                                                        "rep-button target" 
-                                                    } else { 
-                                                        "rep-button" 
-                                                    };
-                                                    view! {
-                                                        <button 
-                                                            class=btn_class
-                                                            on:click=move |_| complete_set(r)
-                                                        >
-                                                            {r}
-                                                        </button>
-                                                    }
-                                                }).collect_view()
-                                            }}
-                                        </div>
-                                        <div class="rep-target-hint">
-                                            {move || format!("Mål: {}", target_reps_str())}
-                                        </div>
+                                    <div class="rep-label">"Tryck antal reps:"</div>
+                                })}
+                                {(!is_timed).then(|| view! {
+                                    <div class="rep-buttons">
+                                        {move || {
+                                            let ex = current_exercise();
+                                            let (min, max) = ex.as_ref()
+                                                .map(|e| parse_target_range(&e.exercise.reps_target))
+                                                .unwrap_or((5, 8));
+                                            let last_reps = ex.as_ref()
+                                                .and_then(|e| e.last_data.as_ref())
+                                                .map(|d| d.reps);
+                                            
+                                            // Center the 12-button grid around the target
+                                            let center = (min + max) / 2;
+                                            let start = (center as i32 - 5).max(1) as u8;
+                                            let end = start + 11; // 12 buttons total
+                                            
+                                            (start..=end).map(|r| {
+                                                let is_last = last_reps == Some(r);
+                                                let is_target = r >= min && r <= max;
+                                                let btn_class = if is_last { 
+                                                    "rep-button last" 
+                                                } else if is_target { 
+                                                    "rep-button target" 
+                                                } else { 
+                                                    "rep-button" 
+                                                };
+                                                view! {
+                                                    <button 
+                                                        class=btn_class
+                                                        on:click=move |_| complete_set(r)
+                                                    >
+                                                        {r}
+                                                    </button>
+                                                }
+                                            }).collect_view()
+                                        }}
+                                    </div>
+                                })}
+                                {(!is_timed).then(|| view! {
+                                    <div class="rep-target-hint">
+                                        {move || format!("Mål: {}", target_reps_str())}
                                     </div>
                                 })}
                                 
