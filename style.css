@@ -1025,10 +1025,10 @@ button {
     color: var(--bg-primary);
 }
 
-.duration-button.selected.target {
-    background: var(--accent-a);
-    border-color: var(--accent-a);
-    color: var(--bg-primary);
+.duration-button.last {
+    border-color: #00aaff;
+    color: #00aaff;
+    background: rgba(0, 170, 255, 0.1);
 }
 
 .timer-start-btn {

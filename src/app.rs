@@ -994,10 +994,10 @@ fn WorkoutActive(
                         let is_dumbbell = matches!(ex_name.as_str(), "Hammercurls" | "Sidolyft");
                         let is_alternating = matches!(ex_name.as_str(), "Utfallssteg" | "Dead Bug");
                         
-                        // Initialize timer duration when exercise changes
-                        if is_timed && timer_selected_duration.get() != target_duration {
-                            set_timer_selected_duration.set(target_duration);
-                        }
+                        // Last used duration for timed exercises (stored as reps)
+                        let last_duration = ex.as_ref()
+                            .and_then(|e| e.last_data.as_ref())
+                            .map(|d| d.reps as u32);
                         
                         view! {
                             <div class=move || if show_timer_flash.get() { "exercise-screen timer-flash" } else { "exercise-screen" }>
@@ -1075,12 +1075,13 @@ fn WorkoutActive(
                                                     <div class="duration-buttons">
                                                         {[15u32, 20, 25, 30, 35, 40, 45].into_iter().map(|d| {
                                                             let is_target = d == target_duration;
-                                                            let is_selected = move || timer_selected_duration.get() == d;
+                                                            let is_last = last_duration == Some(d);
                                                             let btn_class = move || {
-                                                                if is_selected() && is_target {
-                                                                    "duration-button selected target"
-                                                                } else if is_selected() {
+                                                                let is_selected = timer_selected_duration.get() == d;
+                                                                if is_selected {
                                                                     "duration-button selected"
+                                                                } else if is_last {
+                                                                    "duration-button last"
                                                                 } else if is_target {
                                                                     "duration-button target"
                                                                 } else {
