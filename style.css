@@ -1621,14 +1621,14 @@ button {
 
 .weight-line {
     fill: none;
-    stroke: var(--accent-b);
+    stroke: #00ccff; /* Blue/Cyan color to distinguish from Relative Strength */
     stroke-width: 3;
     stroke-linecap: round;
     stroke-linejoin: round;
 }
 
 .weight-point {
-    fill: var(--accent-b);
+    fill: #00ccff;
     stroke: var(--bg-card);
     stroke-width: 2;
 }
@@ -1636,21 +1636,39 @@ button {
 .weight-chart-labels {
     display: flex;
     justify-content: space-between;
-    margin-top: 0.5rem;
-    padding: 0 5px;
+    margin-top: 1rem;
+    padding: 0 10px;
 }
 
 .weight-chart-label {
-    font-size: 0.7rem;
+    font-size: 0.85rem; /* Larger font size */
+    color: var(--fg-secondary);
+}
+
+.bodyweight-ref {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.bodyweight-ref .bw-label {
+    font-size: 0.9rem;
     color: var(--fg-muted);
 }
 
-.weight-chart-value {
-    position: absolute;
-    font-size: 0.7rem;
-    color: var(--accent-b);
-    transform: translate(-50%, -15px);
-    font-weight: 600;
+.bodyweight-ref .bw-value {
+    font-size: 1.25rem;
+    color: #00ccff;
+    font-weight: 700;
+}
+
+.bodyweight-ref .bw-kg {
+    font-size: 0.9rem;
+    color: var(--fg-muted);
 }
 
 .efficiency-main {

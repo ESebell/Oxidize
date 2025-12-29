@@ -337,8 +337,9 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
         storage::load_paused_workout()
     });
     
-    // Get display name reactively - read fresh from storage/auth on every render
+    // Get display name reactively - listen to data_version to update after cloud sync
     let user_display = move || {
+        let _ = data_version.get(); // IMPORTANT: Trigger re-render when sync completes
         storage::load_display_name()
             .or_else(|| auth.get().and_then(|a| a.user.display_name.clone()))
             .or_else(|| auth.get().map(|a| a.user.email.clone()))
@@ -1372,10 +1373,12 @@ fn WeightChart(history: Vec<crate::storage::BodyweightEntry>) -> impl IntoView {
                     let x = get_x(h.timestamp);
                     let y = get_y(h.weight);
                     view! {
-                        <circle cx=x cy=y r="2" class="weight-point" />
+                        <circle cx=x cy=y r="2.5" class="weight-point" />
                         {if idx == 0 || idx == data.len() - 1 || h.weight == max_w || h.weight == min_w {
+                            // Alternate label position to prevent overlap
+                            let y_off = if idx % 2 == 0 { -6.0 } else { 8.0 };
                             view! {
-                                <text x=x y={y-4.0} font-size="4" fill="var(--fg-secondary)" text-anchor="middle" font-family="var(--font)">
+                                <text x=x y={y + y_off} font-size="5" fill="var(--fg-primary)" text-anchor="middle" font-family="var(--font)" font-weight="700">
                                     {format!("{:.1}", h.weight)}
                                 </text>
                             }.into_view()
