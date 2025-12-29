@@ -374,6 +374,9 @@ pub fn save_session(routine_name: String, exercises: Vec<ExerciseRecord>, durati
         }
     }
     
+    // Update activity timestamp
+    crate::supabase::update_last_activity();
+    
     // Save session to cloud
     crate::supabase::save_session_to_cloud(&session);
 

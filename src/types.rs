@@ -157,6 +157,7 @@ pub struct AuthUser {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AuthSession {
     pub access_token: String,
+    pub refresh_token: Option<String>,
     pub user: AuthUser,
 }
 

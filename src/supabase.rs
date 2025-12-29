@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 const SUPABASE_URL: &str = "https://ytnwppbepeojvyedrbnb.supabase.co";
 const SUPABASE_KEY: &str = "sb_publishable_Oqp9Oc-Io5o3o3MUwIVD2A_Tvv_dCuS";
 const AUTH_SESSION_KEY: &str = "oxidize_auth_session";
+const LAST_ACTIVITY_KEY: &str = "oxidize_last_activity";
+const INACTIVITY_TIMEOUT_SECS: i64 = 4 * 60 * 60; // 4 hours
 
 use crate::types::{Session, AuthSession, AuthUser};
 
@@ -14,6 +16,14 @@ use crate::types::{Session, AuthSession, AuthUser};
 #[derive(Deserialize, Debug)]
 struct SupabaseAuthResponse {
     access_token: String,
+    refresh_token: Option<String>,
+    user: SupabaseUser,
+}
+
+#[derive(Deserialize, Debug)]
+struct RefreshTokenResponse {
+    access_token: String,
+    refresh_token: String,
     user: SupabaseUser,
 }
 
@@ -66,6 +76,7 @@ pub async fn sign_up(email: &str, password: &str) -> Result<AuthSession, String>
     
     let session = AuthSession {
         access_token: auth_resp.access_token,
+        refresh_token: auth_resp.refresh_token,
         user: AuthUser {
             id: auth_resp.user.id,
             email: auth_resp.user.email,
@@ -73,6 +84,7 @@ pub async fn sign_up(email: &str, password: &str) -> Result<AuthSession, String>
     };
     
     save_auth_session(&session);
+    update_last_activity();
     Ok(session)
 }
 
@@ -112,6 +124,7 @@ pub async fn sign_in(email: &str, password: &str) -> Result<AuthSession, String>
     
     let session = AuthSession {
         access_token: auth_resp.access_token,
+        refresh_token: auth_resp.refresh_token,
         user: AuthUser {
             id: auth_resp.user.id,
             email: auth_resp.user.email,
@@ -119,13 +132,147 @@ pub async fn sign_in(email: &str, password: &str) -> Result<AuthSession, String>
     };
     
     save_auth_session(&session);
+    update_last_activity();
     Ok(session)
 }
 
-/// Sign out
+/// Sign out - clears local session and calls Supabase sign-out API
 pub fn sign_out() {
+    // Call Supabase sign-out API to invalidate refresh token on server
+    wasm_bindgen_futures::spawn_local(async {
+        let _ = sign_out_api().await;
+    });
+    
+    // Clear local storage
     if let Some(storage) = web_sys::window().and_then(|w| w.local_storage().ok()).flatten() {
         let _ = storage.remove_item(AUTH_SESSION_KEY);
+        let _ = storage.remove_item(LAST_ACTIVITY_KEY);
+    }
+}
+
+/// Call Supabase sign-out API
+async fn sign_out_api() -> Result<(), String> {
+    let window = web_sys::window().ok_or("no window")?;
+    let session = load_auth_session().ok_or("No session")?;
+    
+    let headers = Headers::new().map_err(|_| "Failed to create headers")?;
+    headers.set("apikey", SUPABASE_KEY).map_err(|_| "Failed to set apikey")?;
+    headers.set("Authorization", &format!("Bearer {}", session.access_token)).map_err(|_| "Failed to set auth")?;
+    
+    let opts = RequestInit::new();
+    opts.set_method("POST");
+    opts.set_mode(RequestMode::Cors);
+    opts.set_headers(&JsValue::from(&headers));
+    
+    let url = format!("{}/auth/v1/logout", SUPABASE_URL);
+    let request = Request::new_with_str_and_init(&url, &opts).map_err(|_| "Failed to create request")?;
+    
+    let _ = JsFuture::from(window.fetch_with_request(&request)).await;
+    Ok(())
+}
+
+/// Update last activity timestamp
+pub fn update_last_activity() {
+    if let Some(storage) = web_sys::window().and_then(|w| w.local_storage().ok()).flatten() {
+        let now = js_sys::Date::now() as i64 / 1000;
+        let _ = storage.set_item(LAST_ACTIVITY_KEY, &now.to_string());
+    }
+}
+
+/// Check if session has expired due to inactivity (>4 hours)
+fn is_session_expired() -> bool {
+    if load_auth_session().is_none() {
+        return false;
+    }
+    
+    let storage = match web_sys::window().and_then(|w| w.local_storage().ok()).flatten() {
+        Some(s) => s,
+        None => return false,
+    };
+    
+    let last_activity = storage
+        .get_item(LAST_ACTIVITY_KEY)
+        .ok()
+        .flatten()
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or(0);
+    
+    if last_activity == 0 {
+        return false;
+    }
+    
+    let now = js_sys::Date::now() as i64 / 1000;
+    (now - last_activity) > INACTIVITY_TIMEOUT_SECS
+}
+
+/// Refresh access token using refresh token
+pub async fn refresh_access_token() -> Result<(), String> {
+    let session = load_auth_session().ok_or("No session")?;
+    let refresh_token = session.refresh_token.ok_or("No refresh token")?;
+    
+    let window = web_sys::window().ok_or("no window")?;
+    
+    let body = serde_json::json!({
+        "refresh_token": refresh_token
+    }).to_string();
+    
+    let headers = Headers::new().map_err(|_| "Failed to create headers")?;
+    headers.set("apikey", SUPABASE_KEY).map_err(|_| "Failed to set apikey")?;
+    headers.set("Content-Type", "application/json").map_err(|_| "Failed to set content-type")?;
+    
+    let opts = RequestInit::new();
+    opts.set_method("POST");
+    opts.set_mode(RequestMode::Cors);
+    opts.set_body(&JsValue::from_str(&body));
+    opts.set_headers(&JsValue::from(&headers));
+    
+    let url = format!("{}/auth/v1/token?grant_type=refresh_token", SUPABASE_URL);
+    let request = Request::new_with_str_and_init(&url, &opts).map_err(|_| "Failed to create request")?;
+    
+    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await.map_err(|_| "Fetch failed")?;
+    let resp: Response = resp_value.dyn_into().map_err(|_| "Invalid response")?;
+    
+    if !resp.ok() {
+        return Err("Token refresh failed".into());
+    }
+    
+    let json = JsFuture::from(resp.json().map_err(|_| "No JSON")?).await.map_err(|_| "JSON parse failed")?;
+    let auth_resp: RefreshTokenResponse = serde_wasm_bindgen::from_value(json).map_err(|_| "Invalid response")?;
+    
+    let new_session = AuthSession {
+        access_token: auth_resp.access_token,
+        refresh_token: Some(auth_resp.refresh_token),
+        user: AuthUser {
+            id: auth_resp.user.id,
+            email: auth_resp.user.email,
+        },
+    };
+    
+    save_auth_session(&new_session);
+    web_sys::console::log_1(&"Access token refreshed".into());
+    Ok(())
+}
+
+/// Check session timeout and refresh token if needed
+/// Call this on app start
+pub fn check_and_refresh_session() {
+    // If session expired due to inactivity, sign out
+    if is_session_expired() {
+        web_sys::console::log_1(&"Session expired due to inactivity (4h), signing out".into());
+        sign_out();
+        return;
+    }
+    
+    // If logged in, try to refresh token and update activity
+    if load_auth_session().is_some() {
+        update_last_activity();
+        
+        // Refresh token in background
+        wasm_bindgen_futures::spawn_local(async {
+            if let Err(e) = refresh_access_token().await {
+                web_sys::console::log_1(&format!("Token refresh failed: {}", e).into());
+            }
+        });
     }
 }
 
@@ -458,6 +605,7 @@ pub async fn fetch_last_weights() -> Result<std::collections::HashMap<String, cr
 
 /// Save bodyweight to Supabase
 pub fn save_bodyweight_to_cloud(weight: f64) {
+    update_last_activity();
     wasm_bindgen_futures::spawn_local(async move {
         if let Err(e) = save_bodyweight_async(weight).await {
             web_sys::console::log_1(&format!("Supabase bodyweight save failed: {:?}", e).into());

@@ -11,6 +11,9 @@ use leptos::*;
 pub fn main() {
     console_error_panic_hook::set_once();
     
+    // Check session timeout and refresh token if needed
+    supabase::check_and_refresh_session();
+    
     // Reset sync status so UI knows to wait for fresh data
     storage::reset_sync_status();
     
