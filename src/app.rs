@@ -75,7 +75,6 @@ fn parse_target_reps(target: &str) -> u8 {
 
 #[component]
 pub fn App() -> impl IntoView {
-    web_sys::console::log_1(&"🚀 OXIDIZE STARTING - VERSION: MOLNSYNC_FIX_3".into());
     // Check if user is already logged in
     let initial_view = if supabase::load_auth_session().is_some() {
         AppView::Dashboard
@@ -1754,10 +1753,8 @@ fn Settings(
     // Fetch name from cloud if it's missing or to ensure it's fresh
     create_effect(move |_| {
         spawn_local(async move {
-            web_sys::console::log_1(&"Attempting to fetch display name from cloud...".into());
             match supabase::fetch_display_name().await {
                 Ok(Some(cloud_name)) => {
-                    web_sys::console::log_1(&format!("Fetched name: {}", cloud_name).into());
                     if !cloud_name.is_empty() {
                         set_display_name.set(cloud_name.clone());
                         set_name_input.set(cloud_name.clone());
@@ -1771,24 +1768,17 @@ fn Settings(
                         }
                     }
                 }
-                Ok(None) => {
-                    web_sys::console::log_1(&"No display name found in cloud (returned None)".into());
-                }
-                Err(e) => {
-                    web_sys::console::log_1(&format!("Failed to fetch display name: {:?}", e).into());
-                }
+                _ => {}
             }
         });
     });
     
     let save_display_name = move |_| {
-        web_sys::console::log_1(&"SAVE BUTTON CLICKED!".into());
         let name = name_input.get();
         set_display_name.set(name.clone());
         storage::save_display_name(&name);
         
         // Sync to Supabase (cloud)
-        web_sys::console::log_1(&format!("Calling Supabase with name: {}", name).into());
         supabase::save_display_name_to_cloud(&name);
         
         // Update auth session with new display name

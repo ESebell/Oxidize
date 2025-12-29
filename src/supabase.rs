@@ -1038,11 +1038,10 @@ struct UserSettingsRow {
 /// Save display name to Supabase (fire-and-forget)
 pub fn save_display_name_to_cloud(name: &str) {
     let name = name.to_string();
-    web_sys::console::log_1(&format!("Preparing to save name: {}", name).into());
     update_last_activity();
     wasm_bindgen_futures::spawn_local(async move {
         if let Err(e) = save_display_name_async(&name).await {
-            web_sys::console::log_1(&format!("❌ Supabase display_name save failed: {:?}", e).into());
+            web_sys::console::log_1(&format!("Supabase display_name save failed: {:?}", e).into());
         }
     });
 }
@@ -1062,7 +1061,6 @@ async fn save_display_name_async(name: &str) -> Result<(), JsValue> {
     
     let opts = create_request_init("POST", Some(&body), &headers);
     
-    // Use exact same URL format as save_routine
     let url = format!("{}/rest/v1/user_settings", SUPABASE_URL);
     let request = Request::new_with_str_and_init(&url, &opts)?;
     
@@ -1070,12 +1068,10 @@ async fn save_display_name_async(name: &str) -> Result<(), JsValue> {
     let resp: Response = resp_value.dyn_into()?;
     
     if resp.ok() {
-        web_sys::console::log_1(&"✅ Display name saved successfully!".into());
         Ok(())
     } else {
         let status = resp.status();
         let text = JsFuture::from(resp.text()?).await?.as_string().unwrap_or_default();
-        web_sys::console::log_1(&format!("❌ Supabase error ({}): {}", status, text).into());
         Err(format!("HTTP {}: {}", status, text).into())
     }
 }
