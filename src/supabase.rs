@@ -1200,14 +1200,17 @@ pub async fn call_gemini(api_key: &str, system_prompt: &str, user_prompt: &str) 
     
     let headers = Headers::new()?;
     headers.set("Content-Type", "application/json")?;
-    headers.set("x-goog-api-key", api_key)?;
     
     let opts = RequestInit::new();
     opts.set_method("POST");
     opts.set_headers(&headers);
     opts.set_body(&JsValue::from_str(&body_str));
     
-    let url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+    // Use gemini-pro which is the most stable free-tier model
+    let url = format!(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={}",
+        api_key
+    );
     
     let request = Request::new_with_str_and_init(&url, &opts)?;
     let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
@@ -1215,7 +1218,7 @@ pub async fn call_gemini(api_key: &str, system_prompt: &str, user_prompt: &str) 
     
     if !resp.ok() {
         let text = JsFuture::from(resp.text()?).await?.as_string().unwrap_or_default();
-        return Err(format!("Gemini API error (v4-final, {}): {}", resp.status(), text).into());
+        return Err(format!("Gemini API error (v5-pro, {}): {}", resp.status(), text).into());
     }
     
     let json = JsFuture::from(resp.json()?).await?;
