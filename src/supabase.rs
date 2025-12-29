@@ -1212,6 +1212,11 @@ pub async fn call_gemini(api_key: &str, system_prompt: &str, user_prompt: &str) 
         api_key
     );
     
+    // Debug logging
+    web_sys::console::log_1(&format!("DEBUG: API key length: {}", api_key.len()).into());
+    web_sys::console::log_1(&format!("DEBUG: API key first 10 chars: {}", &api_key[..10.min(api_key.len())]).into());
+    web_sys::console::log_1(&format!("DEBUG: Full URL: {}", url).into());
+    
     let request = Request::new_with_str_and_init(&url, &opts)?;
     let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
     let resp: Response = resp_value.dyn_into()?;
