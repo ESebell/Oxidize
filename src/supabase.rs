@@ -1153,8 +1153,6 @@ pub async fn fetch_api_key() -> Result<Option<String>, JsValue> {
 #[derive(Serialize)]
 struct GeminiRequest {
     contents: Vec<GeminiContent>,
-    #[serde(rename = "generationConfig")]
-    generation_config: GeminiGenerationConfig,
 }
 
 #[derive(Serialize)]
@@ -1165,12 +1163,6 @@ struct GeminiContent {
 #[derive(Serialize)]
 struct GeminiPart {
     text: String,
-}
-
-#[derive(Serialize)]
-struct GeminiGenerationConfig {
-    #[serde(rename = "responseMimeType")]
-    response_mime_type: String,
 }
 
 #[derive(Deserialize)]
@@ -1202,9 +1194,6 @@ pub async fn call_gemini(api_key: &str, system_prompt: &str, user_prompt: &str) 
         contents: vec![GeminiContent {
             parts: vec![GeminiPart { text: full_prompt }],
         }],
-        generation_config: GeminiGenerationConfig {
-            response_mime_type: "application/json".to_string(),
-        },
     };
     
     let body_str = serde_json::to_string(&req_body).map_err(|e| e.to_string())?;
@@ -1218,7 +1207,7 @@ pub async fn call_gemini(api_key: &str, system_prompt: &str, user_prompt: &str) 
     opts.set_body(&JsValue::from_str(&body_str));
     
     let url = format!(
-        "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={}",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={}",
         api_key
     );
     
