@@ -618,63 +618,78 @@ pub fn save_bodyweight_to_cloud(weight: f64) {
 
 async fn save_bodyweight_async(weight: f64) -> Result<(), JsValue> {
     let window = web_sys::window().ok_or("no window")?;
-    let user_id = get_current_user_id();
+    let user_id = get_current_user_id().ok_or("Not logged in")?;
     
     let timestamp = js_sys::Date::now() as i64 / 1000;
-    let body = if let Some(uid) = user_id {
-        format!(r#"{{"weight": {}, "timestamp": {}, "user_id": "{}"}}"#, weight, timestamp, uid)
-    } else {
-        format!(r#"{{"weight": {}, "timestamp": {}}}"#, weight, timestamp)
-    };
     
+    // 1. Save to history table (bodyweight)
+    let history_body = format!(r#"{{"weight": {}, "timestamp": {}, "user_id": "{}"}}"#, weight, timestamp, user_id);
     let headers = get_headers()?;
-    let opts = create_request_init("POST", Some(&body), &headers);
-    
+    let opts = create_request_init("POST", Some(&history_body), &headers);
     let url = format!("{}/rest/v1/bodyweight", SUPABASE_URL);
     let request = Request::new_with_str_and_init(&url, &opts)?;
-    
-    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
-    let resp: Response = resp_value.dyn_into()?;
-    
-    if !resp.ok() {
-        return Err(format!("HTTP error: {}", resp.status()).into());
-    }
+    let _ = JsFuture::from(window.fetch_with_request(&request)).await?;
+
+    // 2. Save to settings table (user_settings) for current weight
+    let settings_row = UserSettingsRow {
+        user_id: user_id.clone(),
+        display_name: crate::storage::load_display_name(),
+        bodyweight: Some(weight),
+    };
+    let settings_body = serde_json::to_string(&settings_row).map_err(|e| e.to_string())?;
+    let settings_headers = get_headers()?;
+    settings_headers.set("Prefer", "resolution=merge-duplicates")?;
+    let settings_opts = create_request_init("POST", Some(&settings_body), &settings_headers);
+    let settings_url = format!("{}/rest/v1/user_settings", SUPABASE_URL);
+    let settings_request = Request::new_with_str_and_init(&settings_url, &settings_opts)?;
+    let _ = JsFuture::from(window.fetch_with_request(&settings_request)).await?;
     
     Ok(())
 }
 
-/// Fetch bodyweight history from Supabase
+/// Fetch bodyweight history and current settings from Supabase
 pub async fn fetch_bodyweight() -> Result<(Option<f64>, Vec<crate::storage::BodyweightEntry>), JsValue> {
     let window = web_sys::window().ok_or("no window")?;
-    
-    // Only fetch bodyweight for current user
     let user_id = get_current_user_id().ok_or("Not logged in")?;
-    
     let headers = get_headers()?;
-    let opts = create_request_init("GET", None, &headers);
+
+    // 1. Fetch current weight from user_settings
+    let settings_opts = create_request_init("GET", None, &headers);
+    let settings_url = format!("{}/rest/v1/user_settings?user_id=eq.{}&select=bodyweight", SUPABASE_URL, user_id);
+    let settings_request = Request::new_with_str_and_init(&settings_url, &settings_opts)?;
+    let settings_resp: Response = JsFuture::from(window.fetch_with_request(&settings_request)).await?.dyn_into()?;
     
-    let url = format!("{}/rest/v1/bodyweight?select=*&user_id=eq.{}&order=timestamp.desc", SUPABASE_URL, user_id);
-    let request = Request::new_with_str_and_init(&url, &opts)?;
+    let mut current_weight = None;
+    if settings_resp.ok() {
+        let json = JsFuture::from(settings_resp.json()?).await?;
+        let rows: Vec<UserSettingsRow> = serde_wasm_bindgen::from_value(json).unwrap_or_default();
+        current_weight = rows.first().and_then(|r| r.bodyweight);
+    }
+
+    // 2. Fetch history from bodyweight table
+    let history_opts = create_request_init("GET", None, &headers);
+    let history_url = format!("{}/rest/v1/bodyweight?select=*&user_id=eq.{}&order=timestamp.desc", SUPABASE_URL, user_id);
+    let history_request = Request::new_with_str_and_init(&history_url, &history_opts)?;
+    let history_resp: Response = JsFuture::from(window.fetch_with_request(&history_request)).await?.dyn_into()?;
     
-    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
-    let resp: Response = resp_value.dyn_into()?;
-    
-    if !resp.ok() {
-        return Err(format!("HTTP error: {}", resp.status()).into());
+    let mut history = vec![];
+    if history_resp.ok() {
+        let json = JsFuture::from(history_resp.json()?).await?;
+        let rows: Vec<BodyweightRow> = serde_wasm_bindgen::from_value(json).unwrap_or_default();
+        history = rows.into_iter()
+            .map(|r| crate::storage::BodyweightEntry {
+                timestamp: r.timestamp,
+                weight: r.weight,
+            })
+            .collect();
     }
     
-    let json = JsFuture::from(resp.json()?).await?;
-    let rows: Vec<BodyweightRow> = serde_wasm_bindgen::from_value(json)?;
+    // If no weight in settings but exists in history, use latest history
+    if current_weight.is_none() {
+        current_weight = history.first().map(|h| h.weight);
+    }
     
-    let current = rows.first().map(|r| r.weight);
-    let history: Vec<crate::storage::BodyweightEntry> = rows.into_iter()
-        .map(|r| crate::storage::BodyweightEntry {
-            timestamp: r.timestamp,
-            weight: r.weight,
-        })
-        .collect();
-    
-    Ok((current, history))
+    Ok((current_weight, history))
 }
 
 /// Sync local data with Supabase (call on app start)
@@ -1033,6 +1048,7 @@ pub fn create_default_routine() -> SavedRoutine {
 struct UserSettingsRow {
     user_id: String,
     display_name: Option<String>,
+    bodyweight: Option<f64>,
 }
 
 /// Save display name to Supabase (fire-and-forget)
@@ -1050,9 +1066,14 @@ async fn save_display_name_async(name: &str) -> Result<(), JsValue> {
     let window = web_sys::window().ok_or("no window")?;
     let user_id = get_current_user_id().ok_or("Not logged in")?;
     
+    // Get current weight from local cache to keep it during name update
+    let db = crate::storage::load_data();
+    let current_bw = db.get_bodyweight();
+
     let row = UserSettingsRow {
         user_id: user_id.clone(),
         display_name: if name.is_empty() { None } else { Some(name.to_string()) },
+        bodyweight: current_bw,
     };
     
     let body = serde_json::to_string(&row).map_err(|e| e.to_string())?;

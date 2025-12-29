@@ -1311,6 +1311,77 @@ fn WorkoutActive(
 }
 
 #[component]
+fn WeightChart(history: Vec<crate::storage::BodyweightEntry>) -> impl IntoView {
+    if history.len() < 2 {
+        return view! { <div class="empty-chart">"Behöver minst två mätningar för en kurva"</div> }.into_view();
+    }
+
+    // Sort by timestamp asc for the chart
+    let mut sorted = history.clone();
+    sorted.sort_by_key(|h| h.timestamp);
+    
+    // Take last 10 entries for clarity
+    let data: Vec<_> = sorted.into_iter().rev().take(10).collect::<Vec<_>>().into_iter().rev().collect();
+    
+    let min_w = data.iter().map(|h| h.weight).fold(f64::INFINITY, f64::min);
+    let max_w = data.iter().map(|h| h.weight).fold(f64::NEG_INFINITY, f64::max);
+    let range = (max_w - min_w).max(1.0);
+    
+    let padding = 20.0;
+    let width = 100.0;
+    let height = 100.0;
+    
+    let get_x = |idx: usize| {
+        if data.len() < 2 { return padding; }
+        padding + (idx as f64 * (width - 2.0 * padding) / (data.len() - 1) as f64)
+    };
+    
+    let get_y = |w: f64| {
+        height - padding - ((w - min_w) / range * (height - 2.0 * padding))
+    };
+    
+    let points: String = data.iter().enumerate()
+        .map(|(i, h)| format!("{},{}", get_x(i), get_y(h.weight)))
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    view! {
+        <div class="weight-chart-container">
+            <svg viewBox=format!("0 0 {} {}", width, height) class="weight-chart-svg">
+                // Grid lines (min/max)
+                <line x1=padding y1={get_y(min_w)} x2={width-padding} y2={get_y(min_w)} stroke="#222" stroke-width="1" stroke-dasharray="2,2" />
+                <line x1=padding y1={get_y(max_w)} x2={width-padding} y2={get_y(max_w)} stroke="#222" stroke-width="1" stroke-dasharray="2,2" />
+                
+                // The line
+                <polyline points=points class="weight-line" />
+                
+                // Points
+                {data.iter().enumerate().map(|(idx, h)| {
+                    let x = get_x(idx);
+                    let y = get_y(h.weight);
+                    view! {
+                        <circle cx=x cy=y r="2" class="weight-point" />
+                        {if idx == 0 || idx == data.len() - 1 || h.weight == max_w || h.weight == min_w {
+                            view! {
+                                <text x=x y={y-4.0} font-size="4" fill="var(--fg-secondary)" text-anchor="middle" font-family="var(--font)">
+                                    {format!("{:.1}", h.weight)}
+                                </text>
+                            }.into_view()
+                        } else {
+                            view! { <text /> }.into_view()
+                        }}
+                    }
+                }).collect_view()}
+            </svg>
+            <div class="weight-chart-labels">
+                <span class="weight-chart-label">{format_date(data.first().unwrap().timestamp)}</span>
+                <span class="weight-chart-label">{format_date(data.last().unwrap().timestamp)}</span>
+            </div>
+        </div>
+    }.into_view()
+}
+
+#[component]
 fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, set_auth: WriteSignal<Option<AuthSession>>) -> impl IntoView {
     // Reactive signal for sync status - poll until complete
     let (sync_status, set_sync_status) = create_signal(storage::get_sync_status().to_string());
@@ -1433,10 +1504,10 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                 </div>
                 
                 // ═══════════════════════════════════════════════════════════════
-                // 2. POWER-TO-WEIGHT RATIO
+                // 2. POWER-TO-WEIGHT RATIO & WEIGHT CURVE
                 // ═══════════════════════════════════════════════════════════════
                 <div class="stat-card">
-                    <div class="stat-card-title">"Relativ Styrka"</div>
+                    <div class="stat-card-title">"Relativ Styrka & Viktkurva"</div>
                     <div class="ptw-section">
                         <div class="ptw-main">
                             <span class="ptw-value">
@@ -1449,6 +1520,12 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                             </span>
                             <span class="ptw-unit">"Styrkeratio"</span>
                         </div>
+                        
+                        {move || {
+                            let _ = data_version.get();
+                            let db = storage::load_data();
+                            view! { <WeightChart history=db.bodyweight_history /> }
+                        }}
                         
                         // Bodyweight reference (read-only, edit in Settings)
                         <div class="bodyweight-ref">
@@ -1733,13 +1810,19 @@ fn Settings(
             set_bodyweight.set(Some(w));
             set_weight_input.set(format!("{:.1}", w));
             
-            // Save to local storage
+            // Save to local storage cache
             let mut local_db = storage::load_data();
             local_db.set_bodyweight(w);
             let _ = storage::save_data(&local_db);
             
-            // Sync to cloud
+            // Sync to cloud - this now updates BOTH current weight and history
             crate::supabase::save_bodyweight_to_cloud(w);
+            
+            // Update auth session cache if it exists
+            if let Some(mut session) = supabase::load_auth_session() {
+                session.user.display_name = storage::load_display_name();
+                supabase::save_auth_session(&session);
+            }
         }
         set_editing_weight.set(false);
     };
