@@ -337,10 +337,22 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
         storage::load_paused_workout()
     });
     
-    // Get display name if set, otherwise fall back to email
-    let user_display = auth.get().map(|a| {
-        a.user.display_name.unwrap_or(a.user.email)
-    }).unwrap_or_default();
+    // Get display name reactively
+    let (display_name_signal, set_display_name_signal) = create_signal(storage::load_display_name());
+    
+    let user_display = move || {
+        display_name_signal.get()
+            .or_else(|| auth.get().map(|a| a.user.email.clone()))
+            .unwrap_or_default()
+    };
+    
+    // Update name if sync finishes
+    create_effect(move |_| {
+        let _ = data_version.get(); // Trigger on sync
+        if let Some(name) = storage::load_display_name() {
+            set_display_name_signal.set(Some(name));
+        }
+    });
     
     // State for confirmation dialog
     let (show_confirm, set_show_confirm) = create_signal(false);
@@ -486,7 +498,7 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
             </button>
             
             <div class="logged-in-info">
-                "inloggad: "{user_display.clone()}<br/>
+                "inloggad: "{move || user_display()}<br/>
                 <button class="logout-link" on:click=move |_| {
                     supabase::sign_out();
                     set_view.set(AppView::Login);
@@ -1758,6 +1770,13 @@ fn Settings(
                         set_display_name.set(cloud_name.clone());
                         set_name_input.set(cloud_name.clone());
                         storage::save_display_name(&cloud_name);
+                        
+                        // Update global auth signal too!
+                        if let Some(mut session) = supabase::load_auth_session() {
+                            session.user.display_name = Some(cloud_name);
+                            supabase::save_auth_session(&session);
+                            set_auth.set(Some(session));
+                        }
                     }
                 }
                 Ok(None) => {
@@ -1782,6 +1801,8 @@ fn Settings(
         if let Some(mut session) = supabase::load_auth_session() {
             session.user.display_name = if name.is_empty() { None } else { Some(name.clone()) };
             supabase::save_auth_session(&session);
+            // UPDATE THE GLOBAL AUTH SIGNAL
+            set_auth.set(Some(session));
         }
         set_editing_name.set(false);
     };

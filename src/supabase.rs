@@ -723,6 +723,12 @@ async fn do_sync() -> Result<(), JsValue> {
     if let Some(name) = &cloud_display_name {
         crate::storage::save_display_name(name);
         web_sys::console::log_1(&format!("Synced display_name from cloud: {}", name).into());
+        
+        // Update auth session in localStorage and signal if possible
+        if let Some(mut session) = load_auth_session() {
+            session.user.display_name = Some(name.clone());
+            save_auth_session(&session);
+        }
     }
     
     web_sys::console::log_1(&format!("CLOUD: {} sessions", cloud_sessions.len()).into());
