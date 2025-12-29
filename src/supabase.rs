@@ -717,6 +717,13 @@ async fn do_sync() -> Result<(), JsValue> {
     let cloud_sessions = fetch_sessions().await.unwrap_or_default();
     let cloud_weights = fetch_last_weights().await.unwrap_or_default();
     let (cloud_bodyweight, cloud_bw_history) = fetch_bodyweight().await.unwrap_or((None, vec![]));
+    let cloud_display_name = fetch_display_name().await.unwrap_or(None);
+    
+    // Save display name to local storage if fetched from cloud
+    if let Some(name) = &cloud_display_name {
+        crate::storage::save_display_name(name);
+        web_sys::console::log_1(&format!("Synced display_name from cloud: {}", name).into());
+    }
     
     web_sys::console::log_1(&format!("CLOUD: {} sessions", cloud_sessions.len()).into());
     
@@ -1012,4 +1019,82 @@ pub fn create_default_routine() -> SavedRoutine {
         is_active: true,
         created_at: now,
     }
+}
+
+// ============ USER SETTINGS (Display Name) ============
+
+#[derive(Serialize, Deserialize, Debug)]
+struct UserSettingsRow {
+    user_id: String,
+    display_name: Option<String>,
+}
+
+/// Save display name to Supabase (fire-and-forget)
+pub fn save_display_name_to_cloud(name: &str) {
+    let name = name.to_string();
+    update_last_activity();
+    wasm_bindgen_futures::spawn_local(async move {
+        if let Err(e) = save_display_name_async(&name).await {
+            web_sys::console::log_1(&format!("Supabase display_name save failed: {:?}", e).into());
+        }
+    });
+}
+
+async fn save_display_name_async(name: &str) -> Result<(), JsValue> {
+    let window = web_sys::window().ok_or("no window")?;
+    let user_id = get_current_user_id().ok_or("Not logged in")?;
+    
+    let row = UserSettingsRow {
+        user_id: user_id.clone(),
+        display_name: if name.is_empty() { None } else { Some(name.to_string()) },
+    };
+    
+    let body = serde_json::to_string(&row).map_err(|e| e.to_string())?;
+    
+    let headers = get_headers()?;
+    headers.set("Prefer", "resolution=merge-duplicates")?;
+    
+    let opts = create_request_init("POST", Some(&body), &headers);
+    
+    let url = format!("{}/rest/v1/user_settings", SUPABASE_URL);
+    let request = Request::new_with_str_and_init(&url, &opts)?;
+    
+    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
+    let resp: Response = resp_value.dyn_into()?;
+    
+    if !resp.ok() {
+        let status = resp.status();
+        let error_text = JsFuture::from(resp.text().map_err(|_| "No text")?)
+            .await
+            .map(|v| v.as_string().unwrap_or_default())
+            .unwrap_or_default();
+        return Err(format!("HTTP {}: {}", status, error_text).into());
+    }
+    
+    web_sys::console::log_1(&"Display name saved to cloud".into());
+    Ok(())
+}
+
+/// Fetch display name from Supabase
+pub async fn fetch_display_name() -> Result<Option<String>, JsValue> {
+    let window = web_sys::window().ok_or("no window")?;
+    let user_id = get_current_user_id().ok_or("Not logged in")?;
+    
+    let headers = get_headers()?;
+    let opts = create_request_init("GET", None, &headers);
+    
+    let url = format!("{}/rest/v1/user_settings?user_id=eq.{}&select=display_name", SUPABASE_URL, user_id);
+    let request = Request::new_with_str_and_init(&url, &opts)?;
+    
+    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
+    let resp: Response = resp_value.dyn_into()?;
+    
+    if !resp.ok() {
+        return Ok(None);
+    }
+    
+    let json = JsFuture::from(resp.json()?).await?;
+    let rows: Vec<UserSettingsRow> = serde_wasm_bindgen::from_value(json).unwrap_or_default();
+    
+    Ok(rows.first().and_then(|r| r.display_name.clone()))
 }

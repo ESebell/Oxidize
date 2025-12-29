@@ -1752,9 +1752,12 @@ fn Settings(
         set_display_name.set(name.clone());
         storage::save_display_name(&name);
         
+        // Sync to Supabase (cloud)
+        supabase::save_display_name_to_cloud(&name);
+        
         // Update auth session with new display name
         if let Some(mut session) = supabase::load_auth_session() {
-            session.user.display_name = if name.is_empty() { None } else { Some(name) };
+            session.user.display_name = if name.is_empty() { None } else { Some(name.clone()) };
             supabase::save_auth_session(&session);
         }
         set_editing_name.set(false);
