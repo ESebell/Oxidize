@@ -1355,9 +1355,8 @@ button {
 
 .history-item {
     display: grid;
-    grid-template-columns: 60px 110px 1fr 50px;
+    grid-template-columns: 20% 35% 25% 20%;
     align-items: center;
-    gap: 0.5rem;
     padding: 0.9rem 0;
     border-bottom: 1px solid var(--border);
     font-size: 0.95rem;
@@ -1377,7 +1376,7 @@ button {
 
 .history-date { 
     color: var(--fg-secondary); 
-    font-size: 0.85rem; 
+    font-size: 0.85rem;
 }
 
 .history-eff { 
@@ -1388,7 +1387,7 @@ button {
 
 .history-duration { 
     color: var(--fg-muted); 
-    font-size: 0.85rem; 
+    font-size: 0.85rem;
     text-align: right;
 }
 
