@@ -1217,7 +1217,7 @@ pub async fn call_gemini(api_key: &str, system_prompt: &str, user_prompt: &str) 
     
     if !resp.ok() {
         let text = JsFuture::from(resp.text()?).await?.as_string().unwrap_or_default();
-        return Err(format!("Gemini API error ({}): {}", resp.status(), text).into());
+        return Err(format!("Gemini API error (v3-stable, {}): {}", resp.status(), text).into());
     }
     
     let json = JsFuture::from(resp.json()?).await?;
