@@ -26,7 +26,7 @@
     
     <!-- Manifest & Styles -->
     <link rel="manifest" href="manifest.json">
-    <link data-trunk rel="css" href="style.css">
+    <link rel="stylesheet" href="./style-ec83a4c5aee1298.css" integrity="sha384-ycEH3sgGdp+aN+Oc0WYwD853nL5H9xH2kCJngYLbbGEyqbTCNL6mxU31YTysdIXM"/>
     
     <!-- Splash screens for iOS -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -51,8 +51,19 @@
     <style>
         input, select, textarea { font-size: 16px !important; }
     </style>
-</head>
+<link rel="modulepreload" href="./oxidize-946b9a9877252048.js" crossorigin="anonymous" integrity="sha384-w9Ce2qRUxSf/jzOTvYy14vVi0MgB5zHDjEj28+C9ctHTIdcxWK7L3DS4ImahqA4z"><link rel="preload" href="./oxidize-946b9a9877252048_bg.wasm" crossorigin="anonymous" integrity="sha384-YcslFBRKPT6IjuPkohP2DCkkQ/i12kKLMbzcxIYHt5/8deusa6V/3GiYa8YyJdaK" as="fetch" type="application/wasm"></head>
 <body>
-    <link data-trunk rel="rust" data-wasm-opt="0"/>
+    
+<script type="module">
+import init, * as bindings from './oxidize-946b9a9877252048.js';
+const wasm = await init({ module_or_path: './oxidize-946b9a9877252048_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
 </body>
 </html>
