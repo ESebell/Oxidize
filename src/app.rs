@@ -585,6 +585,7 @@ fn WorkoutActive(
     let (show_cancel_confirm, set_show_cancel_confirm) = create_signal(false);
     let (is_saving, set_is_saving) = create_signal(false);
     let (show_sync_warning, set_show_sync_warning) = create_signal(false);
+    let (show_image_overlay, set_show_image_overlay) = create_signal(None::<String>); // Holds image URL if visible
     
     // Timer state for timed exercises (like Mountain Climbers)
     let (timer_running, set_timer_running) = create_signal(false);
@@ -1117,7 +1118,31 @@ fn WorkoutActive(
                                 })}
                                 
                                 // Exercise name
-                                <div class="exercise-name-big">{ex_name}</div>
+                                {
+                                    let ex_obj = current_exercise();
+                                    let img_url = ex_obj.as_ref().and_then(|e| e.exercise.image_url.clone());
+                                    let name_display = ex_name.clone();
+                                    
+                                    let img_url_class = img_url.clone();
+                                    let img_url_click = img_url.clone();
+                                    let img_url_hint = img_url.clone();
+                                    
+                                    view! {
+                                        <div 
+                                            class=move || if img_url_class.is_some() { "exercise-name-big has-image" } else { "exercise-name-big" }
+                                            on:click=move |_| {
+                                                if let Some(url) = &img_url_click {
+                                                    set_show_image_overlay.set(Some(url.clone()));
+                                                }
+                                            }
+                                        >
+                                            {name_display}
+                                            {img_url_hint.is_some().then(|| view! {
+                                                <span class="image-hint-icon">" ⓘ"</span>
+                                            })}
+                                        </div>
+                                    }
+                                }
                                 
                                 // Dumbbell hint
                                 {is_dumbbell.then(|| view! {
@@ -1304,6 +1329,16 @@ fn WorkoutActive(
                                 "Ja, avsluta"
                             </button>
                         </div>
+                    </div>
+                </div>
+            })}
+
+            // Image overlay modal
+            {move || show_image_overlay.get().map(|url| view! {
+                <div class="image-overlay-full" on:click=move |_| set_show_image_overlay.set(None)>
+                    <div class="image-overlay-content" on:click=move |e| e.stop_propagation()>
+                        <button class="image-overlay-close" on:click=move |_| set_show_image_overlay.set(None)>"×"</button>
+                        <img src=url alt="Instruktion" class="exercise-instruction-img" />
                     </div>
                 </div>
             })}
