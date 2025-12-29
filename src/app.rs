@@ -1373,12 +1373,12 @@ fn WeightChart(history: Vec<crate::storage::BodyweightEntry>) -> impl IntoView {
                     let x = get_x(h.timestamp);
                     let y = get_y(h.weight);
                     view! {
-                        <circle cx=x cy=y r="3.5" class="weight-point" />
+                        <circle cx=x cy=y r="4" class="weight-point" />
                         {if idx == 0 || idx == data.len() - 1 || h.weight == max_w || h.weight == min_w {
                             // Alternate label position to prevent overlap
-                            let y_off = if idx % 2 == 0 { -8.0 } else { 12.0 };
+                            let y_off = if idx % 2 == 0 { -12.0 } else { 16.0 };
                             view! {
-                                <text x=x y={y + y_off} font-size="8" fill="var(--fg-primary)" text-anchor="middle" font-family="var(--font)" font-weight="700">
+                                <text x=x y={y + y_off} font-size="12" fill="var(--fg-primary)" text-anchor="middle" font-family="var(--font)" font-weight="700">
                                     {format!("{:.1}", h.weight)}
                                 </text>
                             }.into_view()

@@ -633,7 +633,7 @@ async fn save_bodyweight_async(weight: f64) -> Result<(), JsValue> {
     // 2. Save to settings table (user_settings) for CURRENT weight
     // Create a row with ONLY user_id and bodyweight to avoid clobbering display_name
     let settings_row = UserSettingsRow {
-        user_id: user_id.clone(),
+        user_id: Some(user_id.clone()),
         display_name: None, // Will be skipped during serialization
         bodyweight: Some(weight),
     };
@@ -656,7 +656,7 @@ pub async fn fetch_bodyweight() -> Result<(Option<f64>, Vec<crate::storage::Body
 
     // 1. Fetch current weight from user_settings
     let settings_opts = create_request_init("GET", None, &headers);
-    let settings_url = format!("{}/rest/v1/user_settings?user_id=eq.{}&select=bodyweight", SUPABASE_URL, user_id);
+    let settings_url = format!("{}/rest/v1/user_settings?user_id=eq.{}&select=user_id,bodyweight", SUPABASE_URL, user_id);
     let settings_request = Request::new_with_str_and_init(&settings_url, &settings_opts)?;
     let settings_resp: Response = JsFuture::from(window.fetch_with_request(&settings_request)).await?.dyn_into()?;
     
@@ -1047,7 +1047,8 @@ pub fn create_default_routine() -> SavedRoutine {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct UserSettingsRow {
-    user_id: String,
+    #[serde(default)]
+    user_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     display_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1071,7 +1072,7 @@ async fn save_display_name_async(name: &str) -> Result<(), JsValue> {
     
     // Create a row with ONLY user_id and display_name to avoid clobbering bodyweight
     let row = UserSettingsRow {
-        user_id: user_id.clone(),
+        user_id: Some(user_id.clone()),
         display_name: Some(if name.is_empty() { " ".to_string() } else { name.to_string() }),
         bodyweight: None, // Will be skipped during serialization
     };
@@ -1103,7 +1104,7 @@ pub async fn fetch_display_name() -> Result<Option<String>, JsValue> {
     let headers = get_headers()?;
     let opts = create_request_init("GET", None, &headers);
     
-    let url = format!("{}/rest/v1/user_settings?user_id=eq.{}&select=display_name", SUPABASE_URL, user_id);
+    let url = format!("{}/rest/v1/user_settings?user_id=eq.{}&select=user_id,display_name", SUPABASE_URL, user_id);
     let request = Request::new_with_str_and_init(&url, &opts)?;
     
     let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
@@ -1114,7 +1115,9 @@ pub async fn fetch_display_name() -> Result<Option<String>, JsValue> {
     }
     
     let json = JsFuture::from(resp.json()?).await?;
+    web_sys::console::log_1(&format!("DEBUG: fetch_display_name JSON: {:?}", json).into());
     let rows: Vec<UserSettingsRow> = serde_wasm_bindgen::from_value(json).unwrap_or_default();
+    web_sys::console::log_1(&format!("DEBUG: fetch_display_name rows: {:?}", rows).into());
     
     Ok(rows.first().and_then(|r| r.display_name.clone()))
 }
