@@ -1621,16 +1621,16 @@ button {
 
 .weight-line {
     fill: none;
-    stroke: #ffffff;
-    stroke-width: 4;
+    stroke: var(--accent-a);
+    stroke-width: 5;
     stroke-linecap: round;
     stroke-linejoin: round;
 }
 
 .weight-point {
-    fill: #ffffff;
+    fill: var(--accent-a);
     stroke: var(--bg-card);
-    stroke-width: 2.5;
+    stroke-width: 3;
 }
 
 .weight-chart-labels {
@@ -1641,8 +1641,8 @@ button {
 }
 
 .weight-chart-label {
-    font-size: 0.9rem;
-    color: var(--fg-muted);
+    font-size: 1rem;
+    color: var(--fg-secondary);
 }
 
 .bodyweight-ref {
@@ -1661,8 +1661,8 @@ button {
 }
 
 .bodyweight-ref .bw-value {
-    font-size: 1.5rem;
-    color: #ffffff;
+    font-size: 1.75rem;
+    color: var(--accent-a);
     font-weight: 800;
 }
 
