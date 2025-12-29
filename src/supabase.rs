@@ -1206,9 +1206,9 @@ pub async fn call_gemini(api_key: &str, system_prompt: &str, user_prompt: &str) 
     opts.set_headers(&headers);
     opts.set_body(&JsValue::from_str(&body_str));
     
-    // Use gemini-1.0-pro which is the fully qualified name
+    // Use gemini-1.5-flash-latest which should always resolve to the latest flash model
     let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent?key={}",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={}",
         api_key
     );
     
