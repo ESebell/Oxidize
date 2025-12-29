@@ -1316,10 +1316,6 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
     // Reactive data version - increments when data should be reloaded
     let (data_version, set_data_version) = create_signal(0u32);
     
-    // State for bodyweight input
-    let (editing_weight, set_editing_weight) = create_signal(false);
-    let (weight_input, set_weight_input) = create_signal(String::new());
-    
     // Poll sync status until complete, then trigger data reload
     create_effect(move |_| {
         let status = sync_status.get();
@@ -1339,7 +1335,6 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
             let bw = db.get_bodyweight();
             let display_bw = Some(bw.unwrap_or(80.0));
             set_bodyweight.set(display_bw);
-            set_weight_input.set(display_bw.map(|w| format!("{:.1}", w)).unwrap_or_default());
             // Trigger UI refresh
             set_data_version.update(|v| *v += 1);
         }
@@ -1351,23 +1346,6 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
         supabase::sign_out();
         set_auth.set(None);
         set_view.set(AppView::Login);
-    };
-    
-    let save_bodyweight = move |_| {
-        if let Ok(w) = weight_input.get().parse::<f64>() {
-            // Update reactive signal (updates UI immediately)
-            set_bodyweight.set(Some(w));
-            set_weight_input.set(format!("{:.1}", w));
-            
-            // Save to local storage
-            let mut local_db = storage::load_data();
-            local_db.set_bodyweight(w);
-            let _ = storage::save_data(&local_db);
-            
-            // Sync to cloud
-            crate::supabase::save_bodyweight_to_cloud(w);
-        }
-        set_editing_weight.set(false);
     };
     
     // Helper to load fresh data - called in reactive closures
@@ -1467,39 +1445,15 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                             <span class="ptw-unit">"Styrkeratio"</span>
                         </div>
                         
-                        // Bodyweight reference with editor
-                        <div class="bodyweight-edit">
+                        // Bodyweight reference (read-only, edit in Settings)
+                        <div class="bodyweight-ref">
                             {move || {
-                                if editing_weight.get() {
-                                    view! {
-                                        <div class="bw-input-row">
-                                            <input 
-                                                type="number" 
-                                                class="bw-input"
-                                                prop:value=weight_input
-                                                on:input=move |ev| set_weight_input.set(event_target_value(&ev))
-                                            />
-                                            <span class="bw-kg">"kg"</span>
-                                            <button class="bw-save" on:click=save_bodyweight>"✓"</button>
-                                        </div>
-                                    }.into_view()
-                                } else {
-                                    let bw = bodyweight.get();
-                                    let bw_display = bw.map(|w| format!("{:.1}", w)).unwrap_or("--.-".to_string());
-                                    view! {
-                                        <button class="bw-display" on:click=move |_| {
-                                            let input_val = bodyweight.get()
-                                                .map(|w| format!("{:.1}", w))
-                                                .unwrap_or_default(); // Empty if not set
-                                            set_weight_input.set(input_val);
-                                            set_editing_weight.set(true);
-                                        }>
-                                            <span class="bw-label">"Baserat på: "</span>
-                                            <span class="bw-value">{bw_display}</span>
-                                            <span class="bw-kg">" kg"</span>
-                                            <span class="bw-edit-icon">" ✎"</span>
-                                        </button>
-                                    }.into_view()
+                                let bw = bodyweight.get();
+                                let bw_display = bw.map(|w| format!("{:.1}", w)).unwrap_or("--.-".to_string());
+                                view! {
+                                    <span class="bw-label">"Baserat på: "</span>
+                                    <span class="bw-value">{bw_display}</span>
+                                    <span class="bw-kg">" kg"</span>
                                 }
                             }}
                         </div>
@@ -1760,6 +1714,31 @@ fn Settings(
     let (routines, set_routines) = create_signal(Vec::<crate::types::SavedRoutine>::new());
     let (loading, set_loading) = create_signal(true);
     
+    // Bodyweight state
+    let db = storage::load_data();
+    let initial_bw = db.get_bodyweight();
+    let (bodyweight, set_bodyweight) = create_signal(initial_bw);
+    let (editing_weight, set_editing_weight) = create_signal(false);
+    let (weight_input, set_weight_input) = create_signal(
+        initial_bw.map(|w| format!("{:.1}", w)).unwrap_or_default()
+    );
+    
+    let save_bodyweight = move |_| {
+        if let Ok(w) = weight_input.get().parse::<f64>() {
+            set_bodyweight.set(Some(w));
+            set_weight_input.set(format!("{:.1}", w));
+            
+            // Save to local storage
+            let mut local_db = storage::load_data();
+            local_db.set_bodyweight(w);
+            let _ = storage::save_data(&local_db);
+            
+            // Sync to cloud
+            crate::supabase::save_bodyweight_to_cloud(w);
+        }
+        set_editing_weight.set(false);
+    };
+    
     // Load routines on mount
     create_effect(move |_| {
         spawn_local(async move {
@@ -1848,6 +1827,47 @@ fn Settings(
                 <button class="create-routine-btn" on:click=move |_| set_view.set(AppView::RoutineBuilder(None))>
                     "+ Skapa ny rutin"
                 </button>
+            </section>
+            
+            <section class="settings-section">
+                <h2>"Kroppsvikt"</h2>
+                <p class="settings-hint">"Används för att beräkna relativ styrka och kalorier"</p>
+                <div class="bodyweight-setting">
+                    {move || {
+                        if editing_weight.get() {
+                            view! {
+                                <div class="bw-edit-row">
+                                    <input 
+                                        type="number" 
+                                        step="0.1"
+                                        class="bw-input"
+                                        prop:value=weight_input
+                                        on:input=move |ev| set_weight_input.set(event_target_value(&ev))
+                                    />
+                                    <span class="bw-kg">"kg"</span>
+                                    <button class="bw-save" on:click=save_bodyweight>"✓"</button>
+                                    <button class="bw-cancel" on:click=move |_| set_editing_weight.set(false)>"✕"</button>
+                                </div>
+                            }.into_view()
+                        } else {
+                            let bw_display = bodyweight.get()
+                                .map(|w| format!("{:.1} kg", w))
+                                .unwrap_or("Ej angiven".to_string());
+                            view! {
+                                <div class="bw-display-row">
+                                    <span class="bw-value">{bw_display}</span>
+                                    <button class="bw-edit-btn" on:click=move |_| {
+                                        let input_val = bodyweight.get()
+                                            .map(|w| format!("{:.1}", w))
+                                            .unwrap_or_default();
+                                        set_weight_input.set(input_val);
+                                        set_editing_weight.set(true);
+                                    }>"Ändra"</button>
+                                </div>
+                            }.into_view()
+                        }
+                    }}
+                </div>
             </section>
             
             <section class="settings-section">

@@ -1954,7 +1954,62 @@ button {
     font-size: 1rem;
     font-weight: 600;
     color: var(--fg-primary);
+    margin-bottom: 0.5rem;
+}
+
+.settings-hint {
+    font-size: 0.8rem;
+    color: var(--fg-secondary);
     margin-bottom: 1rem;
+}
+
+.bodyweight-setting {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.bw-display-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.bw-value {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--fg-primary);
+}
+
+.bw-edit-btn {
+    padding: 0.5rem 1rem;
+    background: var(--bg-secondary);
+    color: var(--fg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.bw-edit-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.bw-cancel {
+    padding: 0.4rem 0.6rem;
+    background: var(--bg-secondary);
+    color: var(--fg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.bodyweight-ref {
+    font-size: 0.85rem;
+    color: var(--fg-secondary);
+    margin-top: 0.5rem;
 }
 
 .routines-list {
