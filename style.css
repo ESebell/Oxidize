@@ -2723,6 +2723,23 @@ button {
     color: var(--accent-a);
 }
 
+.unlink-superset-btn {
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: #ef4444;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.unlink-superset-btn:active {
+    background: rgba(239, 68, 68, 0.15);
+}
+
 .remove-exercise-btn {
     width: 28px;
     height: 28px;

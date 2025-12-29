@@ -2170,6 +2170,7 @@ fn RoutineBuilder(
                                                 } else {
                                                     String::new()
                                                 };
+                                                let ex_name_for_unlink = ex.name.clone();
                                                 view! {
                                                     <div class={if has_superset { "exercise-item superset" } else { "exercise-item" }}>
                                                         <div class="exercise-main">
@@ -2177,7 +2178,23 @@ fn RoutineBuilder(
                                                             <span class="exercise-detail">{format!("{}×{}", ex.sets, ex.reps_target)}</span>
                                                         </div>
                                                         {if has_superset {
-                                                            view! { <span class="superset-badge">{superset_info}</span> }.into_view()
+                                                            let ex_name_unlink = ex_name_for_unlink.clone();
+                                                            view! { 
+                                                                <span class="superset-badge">{superset_info}</span>
+                                                                <button class="unlink-superset-btn" title="Bryt superset" on:click=move |_| {
+                                                                    let mut p = passes.get();
+                                                                    if let Some(pass) = p.get_mut(idx) {
+                                                                        // Find and unlink both exercises
+                                                                        for ex in &mut pass.exercises {
+                                                                            if ex.name == ex_name_unlink || ex.superset_with.as_ref() == Some(&ex_name_unlink) {
+                                                                                ex.is_superset = false;
+                                                                                ex.superset_with = None;
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                    set_passes.set(p);
+                                                                }>"✂"</button>
+                                                            }.into_view()
                                                         } else {
                                                             view! {
                                                                 <button class="link-superset-btn" on:click=move |_| {
