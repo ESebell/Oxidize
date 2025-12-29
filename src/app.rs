@@ -43,7 +43,11 @@ The JSON must strictly follow this structure:
 
 Rules:
 1. 'reps_target' can be "5", "8-10", or "30 sek".
-2. If 'is_superset' is true, 'superset_with' must be the EXACT name of the next exercise.
+2. SUPERSETS MUST BE IN PAIRS! If you create a superset:
+   - Exercise A must have: "is_superset": true, "superset_with": "Exercise B"
+   - Exercise B must have: "is_superset": true, "superset_with": "Exercise A"
+   - Both exercises must be consecutive in the array.
+   - A single exercise can NEVER be a superset alone!
 3. 'name' in 'passes' must be max 8 chars (e.g., "PASS A", "BEN", "PUSH").
 4. RESPOND ONLY WITH THE RAW JSON. NO MARKDOWN OR EXPLANATIONS."#;
 
@@ -2261,7 +2265,40 @@ fn RoutineBuilder(
                                 .trim();
                                 
                             match serde_json::from_str::<AiRoutineResponse>(clean_json) {
-                                Ok(resp) => {
+                                Ok(mut resp) => {
+                                    // Clean up broken supersets - if an exercise claims to be
+                                    // a superset but its partner isn't properly marked, remove the superset flag
+                                    for pass in &mut resp.passes {
+                                        let exercise_names: Vec<String> = pass.exercises.iter()
+                                            .map(|e| e.name.clone())
+                                            .collect();
+                                        
+                                        for exercise in &mut pass.exercises {
+                                            if exercise.is_superset {
+                                                if let Some(partner_name) = &exercise.superset_with {
+                                                    // Check if partner exists and is also marked as superset pointing back
+                                                    let partner_valid = pass.exercises.iter()
+                                                        .any(|e| &e.name == partner_name 
+                                                             && e.is_superset 
+                                                             && e.superset_with.as_ref() == Some(&exercise.name));
+                                                    
+                                                    if !partner_valid {
+                                                        // Partner doesn't exist or isn't properly linked - remove superset
+                                                        web_sys::console::log_1(&format!(
+                                                            "Removing broken superset from '{}' (partner '{}' not valid)",
+                                                            exercise.name, partner_name
+                                                        ).into());
+                                                        exercise.is_superset = false;
+                                                        exercise.superset_with = None;
+                                                    }
+                                                } else {
+                                                    // is_superset true but no partner specified - remove
+                                                    exercise.is_superset = false;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
                                     set_routine_name.set(resp.name);
                                     set_routine_focus.set(resp.focus);
                                     set_passes.set(resp.passes);
