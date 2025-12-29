@@ -1070,11 +1070,9 @@ async fn save_display_name_async(name: &str) -> Result<(), JsValue> {
     
     if !resp.ok() {
         let status = resp.status();
-        let error_text = JsFuture::from(resp.text().map_err(|_| "No text")?)
-            .await
-            .map(|v| v.as_string().unwrap_or_default())
-            .unwrap_or_default();
-        return Err(format!("HTTP {}: {}", status, error_text).into());
+        let text = JsFuture::from(resp.text()?).await?.as_string().unwrap_or_default();
+        web_sys::console::log_1(&format!("Supabase error saving name ({}): {}", status, text).into());
+        return Err(format!("HTTP {}: {}", status, text).into());
     }
     
     web_sys::console::log_1(&"Display name saved to cloud".into());
