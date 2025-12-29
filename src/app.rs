@@ -337,22 +337,13 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
         storage::load_paused_workout()
     });
     
-    // Get display name reactively
-    let (display_name_signal, set_display_name_signal) = create_signal(storage::load_display_name());
-    
+    // Get display name reactively - read fresh from storage/auth on every render
     let user_display = move || {
-        display_name_signal.get()
+        storage::load_display_name()
+            .or_else(|| auth.get().and_then(|a| a.user.display_name.clone()))
             .or_else(|| auth.get().map(|a| a.user.email.clone()))
             .unwrap_or_default()
     };
-    
-    // Update name if sync finishes
-    create_effect(move |_| {
-        let _ = data_version.get(); // Trigger on sync
-        if let Some(name) = storage::load_display_name() {
-            set_display_name_signal.set(Some(name));
-        }
-    });
     
     // State for confirmation dialog
     let (show_confirm, set_show_confirm) = create_signal(false);
