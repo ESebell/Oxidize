@@ -45,11 +45,7 @@ fn format_date(ts: i64) -> String {
             "Igår".to_string()
         } else {
             let diff_days = ((js_sys::Date::now() / 1000.0) as i64 - ts) / 86400;
-            if diff_days == 1 {
-                "1 dag sedan".to_string()
-            } else {
-                format!("{} dagar sedan", diff_days)
-            }
+            format!("{} dgr sen", diff_days)
         }
     }
 }

@@ -1898,14 +1898,13 @@ button {
 
 .settings-gear {
     position: absolute;
-    top: 1rem;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 28px;
-    height: 28px;
-    padding: 4px;
+    top: 1.2rem;
+    right: 4rem;
+    width: 24px;
+    height: 24px;
+    padding: 2px;
     color: var(--fg-muted);
-    opacity: 0.5;
+    opacity: 0.4;
     transition: all 0.2s ease;
 }
 
