@@ -80,6 +80,7 @@ pub async fn sign_up(email: &str, password: &str) -> Result<AuthSession, String>
         user: AuthUser {
             id: auth_resp.user.id,
             email: auth_resp.user.email,
+            display_name: crate::storage::load_display_name(),
         },
     };
     
@@ -128,6 +129,7 @@ pub async fn sign_in(email: &str, password: &str) -> Result<AuthSession, String>
         user: AuthUser {
             id: auth_resp.user.id,
             email: auth_resp.user.email,
+            display_name: crate::storage::load_display_name(),
         },
     };
     
@@ -245,6 +247,7 @@ pub async fn refresh_access_token() -> Result<(), String> {
         user: AuthUser {
             id: auth_resp.user.id,
             email: auth_resp.user.email,
+            display_name: crate::storage::load_display_name(),
         },
     };
     
@@ -277,7 +280,7 @@ pub fn check_and_refresh_session() {
 }
 
 /// Save auth session to localStorage
-fn save_auth_session(session: &AuthSession) {
+pub fn save_auth_session(session: &AuthSession) {
     if let Some(storage) = web_sys::window().and_then(|w| w.local_storage().ok()).flatten() {
         if let Ok(json) = serde_json::to_string(session) {
             let _ = storage.set_item(AUTH_SESSION_KEY, &json);

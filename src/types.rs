@@ -236,6 +236,7 @@ pub struct Pass {
 pub struct AuthUser {
     pub id: String,
     pub email: String,
+    pub display_name: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

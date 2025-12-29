@@ -5,6 +5,7 @@ const PAUSED_WORKOUT_KEY: &str = "oxidize_paused_workout";
 const SYNC_STATUS_KEY: &str = "oxidize_sync_status";
 const DATA_VERSION_KEY: &str = "oxidize_data_version";
 const ACTIVE_ROUTINE_KEY: &str = "oxidize_active_routine";
+const DISPLAY_NAME_KEY: &str = "oxidize_display_name";
 
 // Sync status: "pending", "success", "failed"
 pub fn get_sync_status() -> &'static str {
@@ -43,6 +44,22 @@ pub fn mark_sync_success() {
         let _ = storage.set_item(SYNC_STATUS_KEY, "success");
     }
     increment_data_version(); // Trigger UI refresh
+}
+
+pub fn load_display_name() -> Option<String> {
+    get_local_storage()
+        .and_then(|s| s.get_item(DISPLAY_NAME_KEY).ok())
+        .flatten()
+}
+
+pub fn save_display_name(name: &str) {
+    if let Some(storage) = get_local_storage() {
+        if name.is_empty() {
+            let _ = storage.remove_item(DISPLAY_NAME_KEY);
+        } else {
+            let _ = storage.set_item(DISPLAY_NAME_KEY, name);
+        }
+    }
 }
 
 pub fn mark_sync_failed() {

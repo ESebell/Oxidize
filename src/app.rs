@@ -337,7 +337,10 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
         storage::load_paused_workout()
     });
     
-    let user_email = auth.get().map(|a| a.user.email).unwrap_or_default();
+    // Get display name if set, otherwise fall back to email
+    let user_display = auth.get().map(|a| {
+        a.user.display_name.unwrap_or(a.user.email)
+    }).unwrap_or_default();
     
     // State for confirmation dialog
     let (show_confirm, set_show_confirm) = create_signal(false);
@@ -483,8 +486,7 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
             </button>
             
             <div class="logged-in-info">
-                "inloggad:"<br/>
-                {user_email.clone()}<br/>
+                "inloggad: "{user_display.clone()}<br/>
                 <button class="logout-link" on:click=move |_| {
                     supabase::sign_out();
                     set_view.set(AppView::Login);
@@ -1739,6 +1741,25 @@ fn Settings(
         set_editing_weight.set(false);
     };
     
+    // Display name state
+    let initial_name = storage::load_display_name().unwrap_or_default();
+    let (display_name, set_display_name) = create_signal(initial_name.clone());
+    let (editing_name, set_editing_name) = create_signal(false);
+    let (name_input, set_name_input) = create_signal(initial_name);
+    
+    let save_display_name = move |_| {
+        let name = name_input.get();
+        set_display_name.set(name.clone());
+        storage::save_display_name(&name);
+        
+        // Update auth session with new display name
+        if let Some(mut session) = supabase::load_auth_session() {
+            session.user.display_name = if name.is_empty() { None } else { Some(name) };
+            supabase::save_auth_session(&session);
+        }
+        set_editing_name.set(false);
+    };
+    
     // Load routines on mount
     create_effect(move |_| {
         spawn_local(async move {
@@ -1862,6 +1883,47 @@ fn Settings(
                                             .unwrap_or_default();
                                         set_weight_input.set(input_val);
                                         set_editing_weight.set(true);
+                                    }>"Ändra"</button>
+                                </div>
+                            }.into_view()
+                        }
+                    }}
+                </div>
+            </section>
+            
+            <section class="settings-section">
+                <h2>"Visningsnamn"</h2>
+                <p class="settings-hint">"Visas på dashboarden istället för e-post"</p>
+                <div class="display-name-setting">
+                    {move || {
+                        if editing_name.get() {
+                            view! {
+                                <div class="name-edit-row">
+                                    <input 
+                                        type="text"
+                                        maxlength="30"
+                                        class="name-input"
+                                        placeholder="Ditt namn"
+                                        prop:value=name_input
+                                        on:input=move |ev| set_name_input.set(event_target_value(&ev))
+                                    />
+                                    <button class="name-save" on:click=save_display_name>"✓"</button>
+                                    <button class="name-cancel" on:click=move |_| set_editing_name.set(false)>"✕"</button>
+                                </div>
+                            }.into_view()
+                        } else {
+                            let name_display = display_name.get();
+                            let name_text = if name_display.is_empty() { 
+                                "Ej angivet".to_string() 
+                            } else { 
+                                name_display 
+                            };
+                            view! {
+                                <div class="name-display-row">
+                                    <span class="name-value">{name_text}</span>
+                                    <button class="name-edit-btn" on:click=move |_| {
+                                        set_name_input.set(display_name.get());
+                                        set_editing_name.set(true);
                                     }>"Ändra"</button>
                                 </div>
                             }.into_view()

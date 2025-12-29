@@ -2012,6 +2012,69 @@ button {
     margin-top: 0.5rem;
 }
 
+/* Display name setting */
+.display-name-setting {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.name-display-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.name-value {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--fg-primary);
+}
+
+.name-edit-btn {
+    padding: 0.5rem 1rem;
+    background: var(--bg-secondary);
+    color: var(--fg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.name-edit-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.name-input {
+    flex: 1;
+    padding: 0.6rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg-primary);
+    font-size: 1rem;
+}
+
+.name-save {
+    padding: 0.5rem 0.75rem;
+    background: var(--accent-a);
+    color: var(--bg-primary);
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+}
+
+.name-cancel {
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-secondary);
+    color: var(--fg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 1rem;
+}
+
 .routines-list {
     display: flex;
     flex-direction: column;
