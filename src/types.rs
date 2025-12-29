@@ -3,12 +3,19 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Exercise {
     pub name: String,
+    #[serde(default)]
     pub sets: u8,
+    #[serde(default)]
     pub reps_target: String,
+    #[serde(default)]
     pub is_superset: bool,
+    #[serde(default)]
     pub superset_with: Option<String>,
+    #[serde(default)]
     pub superset_name: Option<String>,
+    #[serde(default)]
     pub is_bodyweight: bool,
+    #[serde(default)]
     pub duration_secs: Option<u32>,  // Some(30) = timed exercise, None = reps-based
     // Wger API data (optional - for routine builder)
     #[serde(default)]
