@@ -1316,12 +1316,20 @@ fn WeightChart(history: Vec<crate::storage::BodyweightEntry>) -> impl IntoView {
         return view! { <div class="empty-chart">"Behöver minst två mätningar för en kurva"</div> }.into_view();
     }
 
-    // Sort by timestamp asc for the chart
+    // Filter data to only show last 12 months
+    let now = (js_sys::Date::now() / 1000.0) as i64;
+    let one_year_ago = now - (365 * 24 * 60 * 60);
+    
     let mut sorted = history.clone();
     sorted.sort_by_key(|h| h.timestamp);
     
-    // Take last 10 entries for clarity
-    let data: Vec<_> = sorted.into_iter().rev().take(10).collect::<Vec<_>>().into_iter().rev().collect();
+    let data: Vec<_> = sorted.into_iter()
+        .filter(|h| h.timestamp >= one_year_ago)
+        .collect();
+        
+    if data.len() < 2 {
+        return view! { <div class="empty-chart">"Ingen data för senaste året"</div> }.into_view();
+    }
     
     let min_w = data.iter().map(|h| h.weight).fold(f64::INFINITY, f64::min);
     let max_w = data.iter().map(|h| h.weight).fold(f64::NEG_INFINITY, f64::max);
@@ -1331,17 +1339,21 @@ fn WeightChart(history: Vec<crate::storage::BodyweightEntry>) -> impl IntoView {
     let width = 100.0;
     let height = 100.0;
     
-    let get_x = |idx: usize| {
-        if data.len() < 2 { return padding; }
-        padding + (idx as f64 * (width - 2.0 * padding) / (data.len() - 1) as f64)
+    // X-axis is time-based now
+    let first_ts = data.first().unwrap().timestamp;
+    let last_ts = data.last().unwrap().timestamp;
+    let time_range = (last_ts - first_ts).max(1) as f64;
+    
+    let get_x = |ts: i64| {
+        padding + ((ts - first_ts) as f64 / time_range * (width - 2.0 * padding))
     };
     
     let get_y = |w: f64| {
         height - padding - ((w - min_w) / range * (height - 2.0 * padding))
     };
     
-    let points: String = data.iter().enumerate()
-        .map(|(i, h)| format!("{},{}", get_x(i), get_y(h.weight)))
+    let points: String = data.iter()
+        .map(|h| format!("{},{}", get_x(h.timestamp), get_y(h.weight)))
         .collect::<Vec<_>>()
         .join(" ");
 
@@ -1357,7 +1369,7 @@ fn WeightChart(history: Vec<crate::storage::BodyweightEntry>) -> impl IntoView {
                 
                 // Points
                 {data.iter().enumerate().map(|(idx, h)| {
-                    let x = get_x(idx);
+                    let x = get_x(h.timestamp);
                     let y = get_y(h.weight);
                     view! {
                         <circle cx=x cy=y r="2" class="weight-point" />
@@ -1504,10 +1516,10 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                 </div>
                 
                 // ═══════════════════════════════════════════════════════════════
-                // 2. POWER-TO-WEIGHT RATIO & WEIGHT CURVE
+                // 2. POWER-TO-WEIGHT RATIO
                 // ═══════════════════════════════════════════════════════════════
                 <div class="stat-card">
-                    <div class="stat-card-title">"Relativ Styrka & Viktkurva"</div>
+                    <div class="stat-card-title">"Relativ Styrka"</div>
                     <div class="ptw-section">
                         <div class="ptw-main">
                             <span class="ptw-value">
@@ -1520,27 +1532,31 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                             </span>
                             <span class="ptw-unit">"Styrkeratio"</span>
                         </div>
-                        
-                        {move || {
-                            let _ = data_version.get();
-                            let db = storage::load_data();
-                            view! { <WeightChart history=db.bodyweight_history /> }
-                        }}
-                        
-                        // Bodyweight reference (read-only, edit in Settings)
-                        <div class="bodyweight-ref">
-                            {move || {
-                                let bw = bodyweight.get();
-                                let bw_display = bw.map(|w| format!("{:.1}", w)).unwrap_or("--.-".to_string());
-                                view! {
-                                    <span class="bw-label">"Baserat på: "</span>
-                                    <span class="bw-value">{bw_display}</span>
-                                    <span class="bw-kg">" kg"</span>
-                                }
-                            }}
-                        </div>
+                        <div class="ptw-hint">"Total styrka (Big 4) delat med kroppsvikt"</div>
                     </div>
-                    <div class="ptw-hint">"Total styrka (Big 4) delat med kroppsvikt"</div>
+                </div>
+
+                // ═══════════════════════════════════════════════════════════════
+                // 3. WEIGHT CURVE
+                // ═══════════════════════════════════════════════════════════════
+                <div class="stat-card">
+                    <div class="stat-card-title">"Viktutveckling"</div>
+                    {move || {
+                        let _ = data_version.get();
+                        let db = storage::load_data();
+                        view! { <WeightChart history=db.bodyweight_history /> }
+                    }}
+                    <div class="bodyweight-ref">
+                        {move || {
+                            let bw = bodyweight.get();
+                            let bw_display = bw.map(|w| format!("{:.1}", w)).unwrap_or("--.-".to_string());
+                            view! {
+                                <span class="bw-label">"Nuvarande vikt: "</span>
+                                <span class="bw-value">{bw_display}</span>
+                                <span class="bw-kg">" kg"</span>
+                            }
+                        }}
+                    </div>
                 </div>
                 
                 // ═══════════════════════════════════════════════════════════════
