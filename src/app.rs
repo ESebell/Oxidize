@@ -1,4 +1,8 @@
 use leptos::*;
+use serde::{Serialize, Deserialize};
+use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::JsFuture;
+use web_sys::Response;
 use crate::types::{
     AppView, WorkoutData, SetRecord, ExerciseRecord, ExerciseStats, ExerciseWorkoutState, AuthSession,
 };
@@ -41,7 +45,11 @@ fn format_date(ts: i64) -> String {
             "Igår".to_string()
         } else {
             let diff_days = ((js_sys::Date::now() / 1000.0) as i64 - ts) / 86400;
-            format!("{} dagar sedan", diff_days)
+            if diff_days == 1 {
+                "1 dag sedan".to_string()
+            } else {
+                format!("{} dagar sedan", diff_days)
+            }
         }
     }
 }
@@ -89,6 +97,8 @@ pub fn App() -> impl IntoView {
                 AppView::Dashboard => view! { <Dashboard set_view=set_view auth=auth /> }.into_view(),
                 AppView::Workout(routine) => view! { <Workout routine=routine set_view=set_view /> }.into_view(),
                 AppView::Stats => view! { <Stats set_view=set_view auth=auth set_auth=set_auth /> }.into_view(),
+                AppView::Settings => view! { <Settings set_view=set_view auth=auth set_auth=set_auth /> }.into_view(),
+                AppView::RoutineBuilder(id) => view! { <RoutineBuilder routine_id=id set_view=set_view /> }.into_view(),
             }}
         </div>
     }
@@ -264,6 +274,31 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
     let (data_version, set_data_version) = create_signal(storage::get_data_version());
     let (is_loading, set_is_loading) = create_signal(!storage::is_sync_complete());
     
+    // Active routine from Supabase
+    let (active_routine, set_active_routine) = create_signal(Option::<crate::types::SavedRoutine>::None);
+    let (routine_loading, set_routine_loading) = create_signal(true);
+    
+    // Load active routine on mount
+    create_effect(move |_| {
+        spawn_local(async move {
+            match supabase::fetch_routines().await {
+                Ok(routines) => {
+                    let active = routines.into_iter().find(|r| r.is_active);
+                    if let Some(ref r) = active {
+                        // Cache locally for workout loading
+                        storage::save_active_routine(r);
+                    }
+                    set_active_routine.set(active);
+                }
+                Err(_) => {
+                    // Try to load from cache
+                    set_active_routine.set(storage::load_active_routine());
+                }
+            }
+            set_routine_loading.set(false);
+        });
+    });
+    
     // Poll for sync completion
     if !storage::is_sync_complete() {
         use gloo_timers::callback::Interval;
@@ -294,24 +329,30 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
     
     // State for confirmation dialog
     let (show_confirm, set_show_confirm) = create_signal(false);
-    let (pending_routine, set_pending_routine) = create_signal(String::new());
+    let (pending_pass, set_pending_pass) = create_signal(String::new());
     
-    let start_workout = move |routine: &str| {
+    let start_workout_pass = move |pass_name: String| {
         if storage::load_paused_workout().is_some() {
-            set_pending_routine.set(routine.to_string());
+            set_pending_pass.set(pass_name);
             set_show_confirm.set(true);
         } else {
-            set_view.set(AppView::Workout(routine.to_string()));
+            set_view.set(AppView::Workout(pass_name));
         }
     };
     
     let confirm_start = move |_| {
         storage::clear_paused_workout();
-        set_view.set(AppView::Workout(pending_routine.get()));
+        set_view.set(AppView::Workout(pending_pass.get()));
     };
 
     view! {
         <div class="dashboard">
+            <button class="settings-gear" on:click=move |_| set_view.set(AppView::Settings)>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                </svg>
+            </button>
             <div class="logo">"OXIDIZE"</div>
             
             // Show loading indicator while syncing
@@ -343,41 +384,79 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
                             <span class="paused-routine">{&routine_name}</span>
                             <span class="paused-progress">{exercises_done}"/" {total_ex}" övningar · "{elapsed}</span>
                         </div>
-                        <button class="resume-btn" on:click=move |_| set_view.set(AppView::Workout(
-                            if routine_name.contains("A") { "A".to_string() } else { "B".to_string() }
-                        ))>
+                        <button class="resume-btn" on:click={
+                            let rn = routine_name.clone();
+                            move |_| set_view.set(AppView::Workout(rn.clone()))
+                        }>
                             "Fortsätt →"
                         </button>
                     </div>
                 }
             })}
             
-            <button 
-                class="start-btn pass-a"
-                on:click=move |_| start_workout("A")
-            >
-                <span class="start-btn-label">"Pass A"</span>
-                <span class="start-btn-focus">"Ben · Press · Triceps"</span>
-            </button>
-            
-            <button 
-                class="start-btn pass-b"
-                on:click=move |_| start_workout("B")
-            >
-                <span class="start-btn-label">"Pass B"</span>
-                <span class="start-btn-focus">"Rygg · Axlar · Biceps"</span>
-            </button>
+            // Dynamic pass buttons from active routine
+            {move || {
+                if routine_loading.get() {
+                    view! { <p class="loading-passes">"Laddar pass..."</p> }.into_view()
+                } else if let Some(routine) = active_routine.get() {
+                    let pass_count = routine.passes.len();
+                    let size_class = match pass_count {
+                        1..=2 => "size-large",
+                        3 => "size-medium",
+                        4 => "size-small",
+                        _ => "size-tiny",
+                    };
+                    view! {
+                        <div class=format!("pass-buttons {}", size_class)>
+                            {routine.passes.iter().enumerate().map(|(i, pass)| {
+                                let pass_name = pass.name.clone();
+                                let pass_name_click = pass.name.clone();
+                                let btn_class = format!("start-btn pass-{}", (b'a' + i as u8) as char);
+                                let description = if pass.description.is_empty() {
+                                    format!("{} övningar", pass.exercises.len())
+                                } else {
+                                    pass.description.clone()
+                                };
+                                view! {
+                                    <button 
+                                        class=btn_class
+                                        on:click=move |_| start_workout_pass(pass_name_click.clone())
+                                    >
+                                        <span class="start-btn-label">{pass_name}</span>
+                                        <span class="start-btn-focus">{description}</span>
+                                    </button>
+                                }
+                            }).collect_view()}
+                        </div>
+                    }.into_view()
+                } else {
+                    // No active routine - show prompt to create one
+                    view! {
+                        <div class="no-routine">
+                            <p>"Ingen aktiv rutin"</p>
+                            <button class="create-routine-link" on:click=move |_| set_view.set(AppView::Settings)>
+                                "Skapa eller välj rutin →"
+                            </button>
+                        </div>
+                    }.into_view()
+                }
+            }}
 
             {move || {
                 let recent = stats.get().1;
+                let active = active_routine.get();
                 (!recent.is_empty()).then(|| view! {
                     <div class="recent-sessions">
                         <div class="recent-title">"Senaste"</div>
                         {recent.into_iter().map(|s| {
-                            let routine_class = if s.routine.contains("A") { "pass-a" } else { "pass-b" };
+                            // Find pass index for color
+                            let pass_idx = active.as_ref()
+                                .and_then(|r| r.passes.iter().position(|p| p.name == s.routine))
+                                .unwrap_or(0);
+                            let color_class = format!("pass-{}", (b'a' + pass_idx as u8) as char);
                             view! {
                                 <div class="recent-item">
-                                    <span class=format!("recent-routine {}", routine_class)>{&s.routine}</span>
+                                    <span class=format!("recent-routine {}", color_class)>{&s.routine}</span>
                                     <span class="recent-date">{format_date(s.timestamp)}</span>
                                     <span class="recent-duration">{format_time(s.duration_secs)}</span>
                                 </div>
@@ -423,12 +502,14 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
 
 #[component]
 fn Workout(routine: String, set_view: WriteSignal<AppView>) -> impl IntoView {
+    // The routine parameter is now the pass name (e.g., "Pass A", "Ben", etc.)
+    let pass_name = routine.clone();
+    
     // Check for paused workout first
     if let Some(paused) = storage::load_paused_workout() {
-        let expected_routine = if routine == "A" { "Pass A" } else { "Pass B" };
-        if paused.routine_name == expected_routine {
+        if paused.routine_name == pass_name {
             // Resume paused workout
-            let data = storage::get_workout(&routine);
+            let data = storage::get_workout(&pass_name);
             if let Some(mut d) = data {
                 d.exercises = paused.exercises;
                 return view! { 
@@ -446,7 +527,7 @@ fn Workout(routine: String, set_view: WriteSignal<AppView>) -> impl IntoView {
     // Clear any paused workout since we're starting fresh
     storage::clear_paused_workout();
     
-    let data = storage::get_workout(&routine);
+    let data = storage::get_workout(&pass_name);
     
     match data {
         Some(d) => view! { 
@@ -467,7 +548,6 @@ fn WorkoutActive(
     let routine_name = routine.name.clone();
     let routine_name_save = routine_name.clone();
     let routine_name_pause = routine_name.clone();
-    let is_pass_a = routine_name.contains("A");
     
     // Load bodyweight for calorie calculation (use default if not set)
     let db = storage::load_data();
@@ -693,14 +773,12 @@ fn WorkoutActive(
     
     // Store routine name in a signal so it can be accessed from nested closures
     let (routine_name_sig, _) = create_signal(routine_name_save);
-    
-    let accent_class = if is_pass_a { "accent-a" } else { "accent-b" };
 
     view! {
         <div class="workout">
             // Header with progress dots
             <div class="workout-header">
-                <div class=format!("workout-title {}", accent_class)>{&routine.name}</div>
+                <div class="workout-title">{&routine.name}</div>
                 
                 // Progress dots - clickable to open overview
                 <button class="progress-dots" on:click=move |_| set_show_overview.set(true)>
@@ -1657,4 +1735,681 @@ fn ExerciseStatsCard(stats: ExerciseStats) -> impl IntoView {
             })}
         </div>
     }
+}
+
+// ============ SETTINGS ============
+
+#[component]
+fn Settings(
+    set_view: WriteSignal<AppView>,
+    auth: ReadSignal<Option<AuthSession>>,
+    set_auth: WriteSignal<Option<AuthSession>>,
+) -> impl IntoView {
+    let (routines, set_routines) = create_signal(Vec::<crate::types::SavedRoutine>::new());
+    let (loading, set_loading) = create_signal(true);
+    
+    // Load routines on mount
+    create_effect(move |_| {
+        spawn_local(async move {
+            match crate::supabase::fetch_routines().await {
+                Ok(r) => {
+                    set_routines.set(r);
+                    set_loading.set(false);
+                }
+                Err(_) => {
+                    set_loading.set(false);
+                }
+            }
+        });
+    });
+    
+    let do_set_active = move |id: String| {
+        spawn_local(async move {
+            let _ = crate::supabase::set_active_routine(&id).await;
+            // Refresh list
+            if let Ok(r) = crate::supabase::fetch_routines().await {
+                set_routines.set(r);
+            }
+        });
+    };
+    
+    let user_email = auth.get().map(|a| a.user.email.clone()).unwrap_or_default();
+    
+    view! {
+        <div class="settings-container">
+            <header class="settings-header">
+                <button class="back-btn" on:click=move |_| set_view.set(AppView::Dashboard)>
+                    "← Tillbaka"
+                </button>
+                <h1>"Inställningar"</h1>
+            </header>
+            
+            <section class="settings-section">
+                <h2>"Mina rutiner"</h2>
+                
+                {move || if loading.get() {
+                    view! { <p class="loading-text">"Laddar rutiner..."</p> }.into_view()
+                } else {
+                    let routines_list = routines.get();
+                    if routines_list.is_empty() {
+                        view! {
+                            <div class="empty-routines">
+                                <p>"Inga rutiner ännu."</p>
+                                <p>"Klicka nedan för att skapa din första!"</p>
+                            </div>
+                        }.into_view()
+                    } else {
+                        view! {
+                            <div class="routines-list">
+                                {routines_list.into_iter().map(|r| {
+                                    let id = r.id.clone();
+                                    let id_for_edit = r.id.clone();
+                                    let id_for_activate = r.id.clone();
+                                    let is_active = r.is_active;
+                                    view! {
+                                        <div class=format!("routine-card {}", if is_active { "active" } else { "" })>
+                                            <div class="routine-info">
+                                                <span class="routine-name">{&r.name}</span>
+                                                <span class="routine-passes">{format!("{} pass", r.passes.len())}</span>
+                                                {is_active.then(|| view! { <span class="active-badge">"Aktiv"</span> })}
+                                            </div>
+                                            <div class="routine-actions">
+                                                {(!is_active).then(|| {
+                                                    let id_click = id_for_activate.clone();
+                                                    view! {
+                                                        <button class="activate-btn" on:click=move |_| do_set_active(id_click.clone())>
+                                                            "Aktivera"
+                                                        </button>
+                                                    }
+                                                })}
+                                                <button class="edit-btn" on:click=move |_| set_view.set(AppView::RoutineBuilder(Some(id_for_edit.clone())))>
+                                                    "Redigera"
+                                                </button>
+                                            </div>
+                                        </div>
+                                    }
+                                }).collect_view()}
+                            </div>
+                        }.into_view()
+                    }
+                }}
+                
+                <button class="create-routine-btn" on:click=move |_| set_view.set(AppView::RoutineBuilder(None))>
+                    "+ Skapa ny rutin"
+                </button>
+            </section>
+            
+            <section class="settings-section">
+                <h2>"Konto"</h2>
+                <div class="account-info">
+                    <span class="account-email">{user_email}</span>
+                    <button class="logout-btn" on:click=move |_| {
+                        crate::supabase::sign_out();
+                        set_auth.set(None);
+                        set_view.set(AppView::Login);
+                    }>"Logga ut"</button>
+                </div>
+            </section>
+        </div>
+    }
+}
+
+// ============ ROUTINE BUILDER ============
+
+#[component]
+fn RoutineBuilder(
+    routine_id: Option<String>,
+    set_view: WriteSignal<AppView>,
+) -> impl IntoView {
+    let (routine_name, set_routine_name) = create_signal(String::new());
+    let (routine_focus, set_routine_focus) = create_signal(String::new());
+    let (passes, set_passes) = create_signal(Vec::<crate::types::Pass>::new());
+    let (loading, set_loading) = create_signal(routine_id.is_some());
+    let (saving, set_saving) = create_signal(false);
+    let (search_query, set_search_query) = create_signal(String::new());
+    let (search_results, set_search_results) = create_signal(Vec::<WgerExercise>::new());
+    let (searching, set_searching) = create_signal(false);
+    let (selected_pass_idx, set_selected_pass_idx) = create_signal(0usize);
+    // (pass_index, is_finisher)
+    let (adding_exercise_to, set_adding_exercise_to) = create_signal(Option::<(usize, bool)>::None);
+    // (pass_index, exercise_index) - which exercise we want to link as superset
+    let (linking_superset, set_linking_superset) = create_signal(Option::<(usize, usize)>::None);
+    let is_editing = routine_id.is_some();
+    let routine_id_for_save = routine_id.clone();
+    
+    // Load existing routine if editing
+    if let Some(ref id) = routine_id {
+        let id_clone = id.clone();
+        create_effect(move |_| {
+            let id_inner = id_clone.clone();
+            spawn_local(async move {
+                if let Ok(routines) = crate::supabase::fetch_routines().await {
+                    if let Some(r) = routines.into_iter().find(|r| r.id == id_inner) {
+                        set_routine_name.set(r.name);
+                        set_routine_focus.set(r.focus);
+                        set_passes.set(r.passes);
+                    }
+                }
+                set_loading.set(false);
+            });
+        });
+    } else {
+        // New routine - start with one empty pass
+        set_passes.set(vec![crate::types::Pass {
+            name: "Pass 1".to_string(),
+            description: String::new(),
+            exercises: vec![],
+            finishers: vec![],
+        }]);
+    }
+    
+    // Search Wger API
+    let trigger_search = move || {
+        let query = search_query.get();
+        if query.len() < 2 { return; }
+        
+        set_searching.set(true);
+        spawn_local(async move {
+            match search_wger_exercises(&query).await {
+                Ok(results) => set_search_results.set(results),
+                Err(_) => set_search_results.set(vec![]),
+            }
+            set_searching.set(false);
+        });
+    };
+    let do_search = move |_: web_sys::MouseEvent| trigger_search();
+    
+    let add_pass = move |_| {
+        let mut p = passes.get();
+        let num = p.len() + 1;
+        p.push(crate::types::Pass {
+            name: format!("Pass {}", num),
+            description: String::new(),
+            exercises: vec![],
+            finishers: vec![],
+        });
+        set_passes.set(p);
+    };
+    
+    let rename_pass = move |idx: usize, new_name: String| {
+        let mut p = passes.get();
+        if let Some(pass) = p.get_mut(idx) {
+            // Max 8 characters
+            pass.name = new_name.chars().take(8).collect();
+        }
+        set_passes.set(p);
+    };
+    
+    let update_pass_description = move |idx: usize, new_desc: String| {
+        let mut p = passes.get();
+        if let Some(pass) = p.get_mut(idx) {
+            pass.description = new_desc;
+        }
+        set_passes.set(p);
+    };
+    
+    let (trigger_save, set_trigger_save) = create_signal(false);
+    
+    // Effect to handle save
+    {
+        let routine_id_for_save = routine_id_for_save.clone();
+        create_effect(move |_| {
+            if trigger_save.get() {
+                set_trigger_save.set(false);
+                set_saving.set(true);
+                let name = routine_name.get();
+                let focus = routine_focus.get();
+                let passes_data = passes.get();
+                let existing_id = routine_id_for_save.clone();
+                
+                spawn_local(async move {
+                    let now = js_sys::Date::now() as i64 / 1000;
+                    let id = existing_id.unwrap_or_else(|| format!("routine_{}", now));
+                    
+                    let routine = crate::types::SavedRoutine {
+                        id,
+                        user_id: None, // Will be set by supabase::save_routine
+                        name,
+                        focus,
+                        passes: passes_data,
+                        is_active: true,
+                        created_at: now,
+                    };
+                    
+                    let _ = crate::supabase::save_routine(&routine).await;
+                    if !is_editing {
+                        let _ = crate::supabase::set_active_routine(&routine.id).await;
+                    }
+                    set_saving.set(false);
+                    set_view.set(AppView::Settings);
+                });
+            }
+        });
+    }
+    
+    view! {
+        <div class="routine-builder">
+            <header class="builder-header">
+                <button class="back-btn" on:click=move |_| set_view.set(AppView::Settings)>
+                    "← Avbryt"
+                </button>
+                <h1>{if is_editing { "Redigera rutin" } else { "Ny rutin" }}</h1>
+            </header>
+            
+            {move || if loading.get() {
+                view! { <p class="loading-text">"Laddar..."</p> }.into_view()
+            } else {
+                view! {
+                    <div class="builder-content">
+                        <div class="builder-meta">
+                            <input
+                                type="text"
+                                placeholder="Rutinens namn"
+                                class="routine-name-input"
+                                prop:value=routine_name
+                                on:input=move |e| set_routine_name.set(event_target_value(&e))
+                            />
+                            <input
+                                type="text"
+                                placeholder="Fokus (t.ex. Styrka & Hypertrofi)"
+                                class="routine-focus-input"
+                                prop:value=routine_focus
+                                on:input=move |e| set_routine_focus.set(event_target_value(&e))
+                            />
+                        </div>
+                        
+                        <div class="passes-tabs">
+                            {move || passes.get().iter().enumerate().map(|(i, p)| {
+                                let is_selected = selected_pass_idx.get() == i;
+                                view! {
+                                    <button
+                                        class=format!("pass-tab {}", if is_selected { "selected" } else { "" })
+                                        on:click=move |_| set_selected_pass_idx.set(i)
+                                    >
+                                        {&p.name}
+                                    </button>
+                                }
+                            }).collect_view()}
+                            <button class="add-pass-btn" on:click=add_pass>"+"</button>
+                        </div>
+                        
+                        <div class="pass-editor">
+                            {move || {
+                                let idx = selected_pass_idx.get();
+                                let p = passes.get();
+                                if let Some(pass) = p.get(idx) {
+                                    let pass_name = pass.name.clone();
+                                    let pass_desc = pass.description.clone();
+                                    view! {
+                                        <div class="pass-meta-edit">
+                                            <label class="field-label">"Namn (max 8 tecken)"</label>
+                                            <input
+                                                type="text"
+                                                class="pass-name-input"
+                                                maxlength="8"
+                                                placeholder="Passnamn"
+                                                value=pass_name
+                                                on:blur=move |e| {
+                                                    rename_pass(idx, event_target_value(&e));
+                                                }
+                                            />
+                                            <label class="field-label">"Beskrivning"</label>
+                                            <input
+                                                type="text"
+                                                class="pass-desc-input"
+                                                placeholder="t.ex. Ben · Press · Triceps"
+                                                value=pass_desc
+                                                on:blur=move |e| {
+                                                    update_pass_description(idx, event_target_value(&e));
+                                                }
+                                            />
+                                        </div>
+                                        <div class="pass-exercises">
+                                            <h3>"Övningar"</h3>
+                                            {pass.exercises.iter().enumerate().map(|(ei, ex)| {
+                                                let has_superset = ex.is_superset && ex.superset_with.is_some();
+                                                let superset_info = if has_superset {
+                                                    format!(" ⟷ {}", ex.superset_with.as_ref().unwrap_or(&String::new()))
+                                                } else {
+                                                    String::new()
+                                                };
+                                                view! {
+                                                    <div class={if has_superset { "exercise-item superset" } else { "exercise-item" }}>
+                                                        <div class="exercise-main">
+                                                            <span class="exercise-name">{&ex.name}</span>
+                                                            <span class="exercise-detail">{format!("{}×{}", ex.sets, ex.reps_target)}</span>
+                                                        </div>
+                                                        {if has_superset {
+                                                            view! { <span class="superset-badge">{superset_info}</span> }.into_view()
+                                                        } else {
+                                                            view! {
+                                                                <button class="link-superset-btn" on:click=move |_| {
+                                                                    set_linking_superset.set(Some((idx, ei)));
+                                                                }>"⟷"</button>
+                                                            }.into_view()
+                                                        }}
+                                                        <button class="remove-exercise-btn" on:click=move |_| {
+                                                            let mut p = passes.get();
+                                                            if let Some(pass) = p.get_mut(idx) {
+                                                                // Remove superset link from partner if exists
+                                                                if let Some(partner_name) = pass.exercises.get(ei).and_then(|e| e.superset_with.clone()) {
+                                                                    for other in &mut pass.exercises {
+                                                                        if other.name == partner_name {
+                                                                            other.is_superset = false;
+                                                                            other.superset_with = None;
+                                                                        }
+                                                                    }
+                                                                }
+                                                                pass.exercises.remove(ei);
+                                                            }
+                                                            set_passes.set(p);
+                                                        }>"×"</button>
+                                                    </div>
+                                                }
+                                            }).collect_view()}
+                                            
+                                            <button class="add-exercise-btn" on:click=move |_| set_adding_exercise_to.set(Some((idx, false)))>
+                                                "+ Lägg till övning"
+                                            </button>
+                                            
+                                            <h3>"Finishers"</h3>
+                                            {pass.finishers.iter().map(|ex| {
+                                                view! {
+                                                    <div class="exercise-item finisher">
+                                                        <span class="exercise-name">{&ex.name}</span>
+                                                        <span class="exercise-detail">{format!("{}×{}", ex.sets, ex.reps_target)}</span>
+                                                    </div>
+                                                }
+                                            }).collect_view()}
+                                            
+                                            <button class="add-exercise-btn finisher-btn" on:click=move |_| set_adding_exercise_to.set(Some((idx, true)))>
+                                                "+ Lägg till finisher"
+                                            </button>
+                                        </div>
+                                    }.into_view()
+                                } else {
+                                    view! { <p>"Välj ett pass"</p> }.into_view()
+                                }
+                            }}
+                        </div>
+                        
+                        // Exercise search modal
+                        {move || adding_exercise_to.get().map(|(pass_idx, is_finisher)| {
+                            let title = if is_finisher { "Lägg till finisher" } else { "Sök övning" };
+                            
+                            // Common finisher exercises for quick-add
+                            let common_finishers = vec![
+                                ("Mountain Climbers", "30s", "Core, Cardio"),
+                                ("Burpees", "30s", "Helkropp"),
+                                ("Planka", "45s", "Core"),
+                                ("Dead Bug", "30s", "Core"),
+                                ("Jumping Jacks", "30s", "Cardio"),
+                                ("Utfallssteg", "20 reps", "Ben"),
+                                ("Shoulder Taps", "30s", "Core, Axlar"),
+                                ("High Knees", "30s", "Cardio"),
+                            ];
+                            
+                            view! {
+                                <div class="exercise-search-modal">
+                                    <div class="exercise-search-dialog">
+                                        <h3>{title}</h3>
+                                        
+                                        // Quick-add section for finishers
+                                        {if is_finisher {
+                                            view! {
+                                                <div class="quick-add-section">
+                                                    <span class="quick-add-label">"Vanliga finishers:"</span>
+                                                    <div class="quick-add-grid">
+                                                        {common_finishers.into_iter().map(|(name, target, muscles)| {
+                                                            let name_str = name.to_string();
+                                                            let target_str = target.to_string();
+                                                            let muscles_str = muscles.to_string();
+                                                            view! {
+                                                                <button class="quick-add-btn" on:click=move |_| {
+                                                                    let mut p = passes.get();
+                                                                    if let Some(pass) = p.get_mut(pass_idx) {
+                                                                        let is_timed = target_str.contains("s");
+                                                                        let duration = if is_timed {
+                                                                            target_str.trim_end_matches('s').parse::<u32>().ok()
+                                                                        } else {
+                                                                            None
+                                                                        };
+                                                                        let new_ex = crate::types::Exercise {
+                                                                            name: name_str.clone(),
+                                                                            sets: 2,
+                                                                            reps_target: target_str.clone(),
+                                                                            is_superset: false,
+                                                                            superset_with: None,
+                                                                            superset_name: None,
+                                                                            is_bodyweight: true,
+                                                                            duration_secs: duration,
+                                                                            primary_muscles: muscles_str.split(", ").map(|s| s.to_string()).collect(),
+                                                                            secondary_muscles: vec![],
+                                                                            image_url: None,
+                                                                            equipment: Some("Kroppsvikt".to_string()),
+                                                                            wger_id: None,
+                                                                        };
+                                                                        pass.finishers.push(new_ex);
+                                                                    }
+                                                                    set_passes.set(p);
+                                                                    set_adding_exercise_to.set(None);
+                                                                }>
+                                                                    <span class="quick-name">{name}</span>
+                                                                    <span class="quick-detail">{target}" · "{muscles}</span>
+                                                                </button>
+                                                            }
+                                                        }).collect_view()}
+                                                    </div>
+                                                </div>
+                                                <div class="search-divider">"— eller sök —"</div>
+                                            }.into_view()
+                                        } else {
+                                            view! { <span></span> }.into_view()
+                                        }}
+                                        
+                                        <div class="search-box">
+                                            <input
+                                                type="text"
+                                                placeholder={if is_finisher { "Sök kroppsviktsövning..." } else { "Sök (t.ex. bench, squat)" }}
+                                                prop:value=search_query
+                                                on:input=move |e| set_search_query.set(event_target_value(&e))
+                                                on:keydown=move |e| {
+                                                    if e.key() == "Enter" {
+                                                        trigger_search();
+                                                    }
+                                                }
+                                            />
+                                            <button on:click=do_search disabled=searching>
+                                                {if searching.get() { "..." } else { "Sök" }}
+                                            </button>
+                                        </div>
+                                        
+                                        <div class="search-results">
+                                            {move || search_results.get().into_iter().map(|ex| {
+                                                let ex_clone = ex.clone();
+                                                view! {
+                                                    <div class="search-result-item" on:click=move |_| {
+                                                        // Add exercise to pass
+                                                        let mut p = passes.get();
+                                                        if let Some(pass) = p.get_mut(pass_idx) {
+                                                            let mut new_ex = crate::types::Exercise::from_wger(
+                                                                &ex_clone.name,
+                                                                3,
+                                                                if is_finisher { "30s" } else { "8-12" },
+                                                                ex_clone.primary_muscles.clone(),
+                                                                ex_clone.secondary_muscles.clone(),
+                                                                ex_clone.image_url.clone(),
+                                                                ex_clone.equipment.clone(),
+                                                                ex_clone.id,
+                                                            );
+                                                            if is_finisher {
+                                                                new_ex.is_bodyweight = true;
+                                                                pass.finishers.push(new_ex);
+                                                            } else {
+                                                                pass.exercises.push(new_ex);
+                                                            }
+                                                        }
+                                                        set_passes.set(p);
+                                                        set_adding_exercise_to.set(None);
+                                                        set_search_results.set(vec![]);
+                                                        set_search_query.set(String::new());
+                                                    }>
+                                                        {ex.image_url.as_ref().map(|url| view! {
+                                                            <img src=url.clone() class="result-thumb" />
+                                                        })}
+                                                        <div class="result-info">
+                                                            <span class="result-name">{&ex.name}</span>
+                                                            <span class="result-muscles">{ex.primary_muscles.join(", ")}</span>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            }).collect_view()}
+                                        </div>
+                                        
+                                        <button class="close-search-btn" on:click=move |_| {
+                                            set_adding_exercise_to.set(None);
+                                            set_search_results.set(vec![]);
+                                        }>"Stäng"</button>
+                                    </div>
+                                </div>
+                            }
+                        })}
+                        
+                        // Superset picker modal
+                        {move || linking_superset.get().map(|(pass_idx, exercise_idx)| {
+                            let p = passes.get();
+                            let pass = p.get(pass_idx);
+                            let source_name = pass.and_then(|p| p.exercises.get(exercise_idx)).map(|e| e.name.clone()).unwrap_or_default();
+                            let available: Vec<(usize, String)> = pass.map(|p| {
+                                p.exercises.iter().enumerate()
+                                    .filter(|(i, ex)| *i != exercise_idx && !ex.is_superset)
+                                    .map(|(i, ex)| (i, ex.name.clone()))
+                                    .collect()
+                            }).unwrap_or_default();
+                            
+                            view! {
+                                <div class="superset-picker-modal">
+                                    <div class="superset-picker-dialog">
+                                        <h3>"Länka superset"</h3>
+                                        <p class="superset-source">{format!("Länka \"{}\" med:", source_name)}</p>
+                                        
+                                        {if available.is_empty() {
+                                            view! { <p class="no-options">"Inga övningar att länka med"</p> }.into_view()
+                                        } else {
+                                            view! {
+                                                <div class="superset-options">
+                                                    {available.into_iter().map(|(other_idx, other_name)| {
+                                                        let name_for_closure = other_name.clone();
+                                                        let source_for_closure = source_name.clone();
+                                                        view! {
+                                                            <button class="superset-option" on:click=move |_| {
+                                                                let mut p = passes.get();
+                                                                if let Some(pass) = p.get_mut(pass_idx) {
+                                                                    // Link both exercises
+                                                                    if let Some(ex1) = pass.exercises.get_mut(exercise_idx) {
+                                                                        ex1.is_superset = true;
+                                                                        ex1.superset_with = Some(name_for_closure.clone());
+                                                                    }
+                                                                    if let Some(ex2) = pass.exercises.get_mut(other_idx) {
+                                                                        ex2.is_superset = true;
+                                                                        ex2.superset_with = Some(source_for_closure.clone());
+                                                                    }
+                                                                }
+                                                                set_passes.set(p);
+                                                                set_linking_superset.set(None);
+                                                            }>{other_name}</button>
+                                                        }
+                                                    }).collect_view()}
+                                                </div>
+                                            }.into_view()
+                                        }}
+                                        
+                                        <button class="close-search-btn" on:click=move |_| {
+                                            set_linking_superset.set(None);
+                                        }>"Avbryt"</button>
+                                    </div>
+                                </div>
+                            }
+                        })}
+                        
+                        <button
+                            class="save-routine-btn"
+                            on:click=move |_| set_trigger_save.set(true)
+                            disabled=saving
+                        >
+                            {if saving.get() { "Sparar..." } else { "Spara rutin" }}
+                        </button>
+                    </div>
+                }.into_view()
+            }}
+        </div>
+    }
+}
+
+// Wger API types
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct WgerExercise {
+    id: u32,
+    name: String,
+    primary_muscles: Vec<String>,
+    secondary_muscles: Vec<String>,
+    image_url: Option<String>,
+    equipment: Option<String>,
+}
+
+async fn search_wger_exercises(query: &str) -> Result<Vec<WgerExercise>, JsValue> {
+    let window = web_sys::window().ok_or("no window")?;
+    
+    let url = format!("https://wger.de/api/v2/exercise/search/?language=2&term={}", query);
+    let resp_value = JsFuture::from(window.fetch_with_str(&url)).await?;
+    let resp: Response = resp_value.dyn_into()?;
+    
+    if !resp.ok() {
+        return Ok(vec![]);
+    }
+    
+    let json = JsFuture::from(resp.json()?).await?;
+    
+    #[derive(Deserialize)]
+    struct WgerSearchResponse {
+        suggestions: Vec<WgerSuggestion>,
+    }
+    
+    #[derive(Deserialize)]
+    struct WgerSuggestion {
+        value: String,
+        data: WgerSuggestionData,
+    }
+    
+    #[derive(Deserialize)]
+    struct WgerSuggestionData {
+        id: u32,
+        name: String,
+        category: String,
+        image: Option<String>,
+    }
+    
+    let search_resp: WgerSearchResponse = serde_wasm_bindgen::from_value(json).unwrap_or(WgerSearchResponse { suggestions: vec![] });
+    
+    // Convert to our format
+    let exercises: Vec<WgerExercise> = search_resp.suggestions.into_iter().take(10).map(|s| {
+        let image_url = s.data.image.map(|img| {
+            if img.starts_with("http") {
+                img
+            } else {
+                format!("https://wger.de{}", img)
+            }
+        });
+        
+        WgerExercise {
+            id: s.data.id,
+            name: s.data.name,
+            primary_muscles: vec![s.data.category],
+            secondary_muscles: vec![],
+            image_url,
+            equipment: None,
+        }
+    }).collect();
+    
+    Ok(exercises)
 }

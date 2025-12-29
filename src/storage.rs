@@ -4,6 +4,7 @@ use crate::types::*;
 const PAUSED_WORKOUT_KEY: &str = "oxidize_paused_workout";
 const SYNC_STATUS_KEY: &str = "oxidize_sync_status";
 const DATA_VERSION_KEY: &str = "oxidize_data_version";
+const ACTIVE_ROUTINE_KEY: &str = "oxidize_active_routine";
 
 // Sync status: "pending", "success", "failed"
 pub fn get_sync_status() -> &'static str {
@@ -53,6 +54,27 @@ pub fn mark_sync_failed() {
 pub fn reset_sync_status() {
     if let Some(storage) = get_local_storage() {
         let _ = storage.set_item(SYNC_STATUS_KEY, "pending");
+    }
+}
+
+// Active routine storage
+pub fn save_active_routine(routine: &SavedRoutine) {
+    if let Some(storage) = get_local_storage() {
+        if let Ok(json) = serde_json::to_string(routine) {
+            let _ = storage.set_item(ACTIVE_ROUTINE_KEY, &json);
+        }
+    }
+}
+
+pub fn load_active_routine() -> Option<SavedRoutine> {
+    let storage = get_local_storage()?;
+    let json = storage.get_item(ACTIVE_ROUTINE_KEY).ok()??;
+    serde_json::from_str(&json).ok()
+}
+
+pub fn clear_active_routine() {
+    if let Some(storage) = get_local_storage() {
+        let _ = storage.remove_item(ACTIVE_ROUTINE_KEY);
     }
 }
 
@@ -312,14 +334,34 @@ pub fn get_all_exercise_names() -> Vec<String> {
     names
 }
 
-pub fn get_workout(routine_id: &str) -> Option<WorkoutData> {
+pub fn get_workout(pass_name: &str) -> Option<WorkoutData> {
     let db = load_data();
-    let routine = match routine_id {
-        "A" => get_routine_a(),
-        "B" => get_routine_b(),
+    
+    // Try to find pass in active routine from Supabase
+    if let Some(saved_routine) = load_active_routine() {
+        if let Some(pass) = saved_routine.passes.iter().find(|p| p.name == pass_name) {
+            let routine = Routine {
+                name: pass.name.clone(),
+                focus: saved_routine.focus.clone(),
+                exercises: pass.exercises.clone(),
+                finishers: pass.finishers.clone(),
+            };
+            
+            return Some(create_workout_data(routine, &db));
+        }
+    }
+    
+    // Fallback to hardcoded routines for backwards compatibility
+    let routine = match pass_name {
+        "A" | "Pass A" => get_routine_a(),
+        "B" | "Pass B" => get_routine_b(),
         _ => return None,
     };
 
+    Some(create_workout_data(routine, &db))
+}
+
+fn create_workout_data(routine: Routine, db: &Database) -> WorkoutData {
     // Combine main exercises and finishers
     let all_exercises: Vec<&Exercise> = routine
         .exercises
@@ -346,7 +388,7 @@ pub fn get_workout(routine_id: &str) -> Option<WorkoutData> {
         })
         .collect();
 
-    Some(WorkoutData { routine, exercises })
+    WorkoutData { routine, exercises }
 }
 
 pub fn save_session(routine_name: String, exercises: Vec<ExerciseRecord>, duration_secs: i64) {

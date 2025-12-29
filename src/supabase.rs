@@ -9,7 +9,7 @@ const AUTH_SESSION_KEY: &str = "oxidize_auth_session";
 const LAST_ACTIVITY_KEY: &str = "oxidize_last_activity";
 const INACTIVITY_TIMEOUT_SECS: i64 = 4 * 60 * 60; // 4 hours
 
-use crate::types::{Session, AuthSession, AuthUser};
+use crate::types::{Session, AuthSession, AuthUser, SavedRoutine, Pass, Exercise};
 
 // ============ AUTH ============
 
@@ -774,4 +774,239 @@ async fn do_sync() -> Result<(), JsValue> {
     web_sys::console::log_1(&"SYNC COMPLETE".into());
     web_sys::console::log_1(&"═══════════════════════════════════════".into());
     Ok(())
+}
+
+// ============ ROUTINES ============
+
+#[derive(Serialize, Deserialize, Debug)]
+struct RoutineRow {
+    id: String,
+    user_id: Option<String>,
+    name: String,
+    focus: String,
+    passes: serde_json::Value,
+    is_active: bool,
+    created_at: i64,
+}
+
+/// Fetch all routines for the current user
+pub async fn fetch_routines() -> Result<Vec<SavedRoutine>, JsValue> {
+    let window = web_sys::window().ok_or("no window")?;
+    let user_id = match get_current_user_id() {
+        Some(id) => id,
+        None => return Ok(vec![]),
+    };
+    
+    let headers = get_headers()?;
+    
+    let opts = RequestInit::new();
+    opts.set_method("GET");
+    opts.set_mode(RequestMode::Cors);
+    opts.set_headers(&JsValue::from(&headers));
+    
+    let url = format!("{}/rest/v1/routines?user_id=eq.{}&order=created_at.desc", SUPABASE_URL, user_id);
+    let request = Request::new_with_str_and_init(&url, &opts)?;
+    
+    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
+    let resp: Response = resp_value.dyn_into()?;
+    
+    if !resp.ok() {
+        return Ok(vec![]);
+    }
+    
+    let json = JsFuture::from(resp.json()?).await?;
+    let rows: Vec<RoutineRow> = serde_wasm_bindgen::from_value(json).unwrap_or_default();
+    
+    let routines: Vec<SavedRoutine> = rows.into_iter().map(|r| {
+        let passes: Vec<Pass> = serde_json::from_value(r.passes).unwrap_or_default();
+        SavedRoutine {
+            id: r.id,
+            user_id: r.user_id,
+            name: r.name,
+            focus: r.focus,
+            passes,
+            is_active: r.is_active,
+            created_at: r.created_at,
+        }
+    }).collect();
+    
+    Ok(routines)
+}
+
+/// Get the active routine for the current user
+pub async fn get_active_routine() -> Result<Option<SavedRoutine>, JsValue> {
+    let routines = fetch_routines().await?;
+    Ok(routines.into_iter().find(|r| r.is_active))
+}
+
+/// Save a routine to Supabase
+pub async fn save_routine(routine: &SavedRoutine) -> Result<(), JsValue> {
+    let window = web_sys::window().ok_or("no window")?;
+    let user_id = match get_current_user_id() {
+        Some(id) => id,
+        None => {
+            web_sys::console::log_1(&"Cannot save routine: not logged in".into());
+            return Err("Not logged in".into());
+        }
+    };
+    
+    let passes_json = serde_json::to_value(&routine.passes).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    
+    let body = serde_json::json!({
+        "id": routine.id,
+        "user_id": user_id,
+        "name": routine.name,
+        "focus": routine.focus,
+        "passes": passes_json,
+        "is_active": routine.is_active,
+        "created_at": routine.created_at
+    }).to_string();
+    
+    let headers = get_headers()?;
+    headers.set("Content-Type", "application/json")?;
+    headers.set("Prefer", "resolution=merge-duplicates")?;
+    
+    let opts = RequestInit::new();
+    opts.set_method("POST");
+    opts.set_mode(RequestMode::Cors);
+    opts.set_body(&JsValue::from_str(&body));
+    opts.set_headers(&JsValue::from(&headers));
+    
+    let url = format!("{}/rest/v1/routines", SUPABASE_URL);
+    let request = Request::new_with_str_and_init(&url, &opts)?;
+    
+    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
+    let resp: Response = resp_value.dyn_into()?;
+    
+    if !resp.ok() {
+        let text = JsFuture::from(resp.text()?).await?;
+        web_sys::console::log_1(&format!("Save routine failed: {:?}", text).into());
+        return Err(text);
+    }
+    
+    web_sys::console::log_1(&format!("Routine '{}' saved", routine.name).into());
+    Ok(())
+}
+
+/// Set a routine as active (and deactivate others)
+pub async fn set_active_routine(routine_id: &str) -> Result<(), JsValue> {
+    let window = web_sys::window().ok_or("no window")?;
+    let user_id = match get_current_user_id() {
+        Some(id) => id,
+        None => return Err("Not logged in".into()),
+    };
+    
+    // First, deactivate all routines
+    let headers = get_headers()?;
+    headers.set("Content-Type", "application/json")?;
+    
+    let deactivate_body = serde_json::json!({ "is_active": false }).to_string();
+    let opts = RequestInit::new();
+    opts.set_method("PATCH");
+    opts.set_mode(RequestMode::Cors);
+    opts.set_body(&JsValue::from_str(&deactivate_body));
+    opts.set_headers(&JsValue::from(&headers));
+    
+    let url = format!("{}/rest/v1/routines?user_id=eq.{}", SUPABASE_URL, user_id);
+    let request = Request::new_with_str_and_init(&url, &opts)?;
+    let _ = JsFuture::from(window.fetch_with_request(&request)).await?;
+    
+    // Then activate the selected routine
+    let activate_body = serde_json::json!({ "is_active": true }).to_string();
+    let headers2 = get_headers()?;
+    headers2.set("Content-Type", "application/json")?;
+    
+    let opts2 = RequestInit::new();
+    opts2.set_method("PATCH");
+    opts2.set_mode(RequestMode::Cors);
+    opts2.set_body(&JsValue::from_str(&activate_body));
+    opts2.set_headers(&JsValue::from(&headers2));
+    
+    let url2 = format!("{}/rest/v1/routines?id=eq.{}&user_id=eq.{}", SUPABASE_URL, routine_id, user_id);
+    let request2 = Request::new_with_str_and_init(&url2, &opts2)?;
+    let _ = JsFuture::from(window.fetch_with_request(&request2)).await?;
+    
+    web_sys::console::log_1(&format!("Routine {} activated", routine_id).into());
+    Ok(())
+}
+
+/// Delete a routine
+pub async fn delete_routine(routine_id: &str) -> Result<(), JsValue> {
+    let window = web_sys::window().ok_or("no window")?;
+    let user_id = match get_current_user_id() {
+        Some(id) => id,
+        None => return Err("Not logged in".into()),
+    };
+    
+    let headers = get_headers()?;
+    
+    let opts = RequestInit::new();
+    opts.set_method("DELETE");
+    opts.set_mode(RequestMode::Cors);
+    opts.set_headers(&JsValue::from(&headers));
+    
+    let url = format!("{}/rest/v1/routines?id=eq.{}&user_id=eq.{}", SUPABASE_URL, routine_id, user_id);
+    let request = Request::new_with_str_and_init(&url, &opts)?;
+    
+    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
+    let resp: Response = resp_value.dyn_into()?;
+    
+    if !resp.ok() {
+        return Err("Delete failed".into());
+    }
+    
+    web_sys::console::log_1(&format!("Routine {} deleted", routine_id).into());
+    Ok(())
+}
+
+/// Create default routine from current hardcoded passes
+pub fn create_default_routine() -> SavedRoutine {
+    let pass_a = Pass {
+        name: "Pass A".to_string(),
+        description: "Ben · Press · Triceps".to_string(),
+        exercises: vec![
+            Exercise::standard("Knäböj", 3, "5-8"),
+            Exercise::standard("Bänkpress", 3, "5-8"),
+            Exercise::standard("Hip Thrusts", 3, "8-12"),
+            Exercise::standard("Latsdrag", 3, "8-10"),
+            Exercise::superset("Leg Curls", 2, "12-15", "Dips", Some("Ben/Triceps")),
+            Exercise::superset("Dips", 2, "AMRAP", "Leg Curls", Some("Ben/Triceps")),
+            Exercise::standard("Stående vadpress", 3, "12-15"),
+        ],
+        finishers: vec![
+            Exercise::finisher("Shoulder Taps", 3, "20"),
+            Exercise::timed_finisher("Mountain Climbers", 3, 30),
+        ],
+    };
+    
+    let pass_b = Pass {
+        name: "Pass B".to_string(),
+        description: "Rygg · Axlar · Biceps".to_string(),
+        exercises: vec![
+            Exercise::standard("Marklyft", 3, "5"),
+            Exercise::standard("Militärpress", 3, "8-10"),
+            Exercise::standard("Sittande rodd", 3, "10-12"),
+            Exercise::superset("Sidolyft", 3, "12-15", "Hammercurls", Some("Axlar/Armar")),
+            Exercise::superset("Hammercurls", 3, "10-12", "Sidolyft", Some("Axlar/Armar")),
+            Exercise::superset("Facepulls", 3, "15", "Sittande vadpress", Some("Rygg/Vader")),
+            Exercise::superset("Sittande vadpress", 3, "15-20", "Facepulls", Some("Rygg/Vader")),
+        ],
+        finishers: vec![
+            Exercise::finisher("Dead Bug", 3, "12"),
+            Exercise::finisher("Utfallssteg", 3, "20"),
+        ],
+    };
+    
+    let now = js_sys::Date::now() as i64 / 1000;
+    let id = format!("default_{}", now);
+    
+    SavedRoutine {
+        id,
+        user_id: None,
+        name: "Överkropp/Underkropp".to_string(),
+        focus: "Styrka & Hypertrofi".to_string(),
+        passes: vec![pass_a, pass_b],
+        is_active: true,
+        created_at: now,
+    }
 }

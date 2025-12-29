@@ -197,6 +197,7 @@ button {
    ═══════════════════════════════════════════════════════════════ */
 
 .dashboard {
+    position: relative;
     min-height: 100vh;
     min-height: 100dvh;
     display: flex;
@@ -349,6 +350,9 @@ button {
 
 .recent-routine.pass-a { color: var(--accent-a); }
 .recent-routine.pass-b { color: var(--accent-b); }
+.recent-routine.pass-c { color: #00ccff; }
+.recent-routine.pass-d { color: #ff66cc; }
+.recent-routine.pass-e { color: #ffcc00; }
 
 .recent-date { color: var(--fg-secondary); }
 .recent-duration { color: var(--fg-muted); font-size: 0.7rem; }
@@ -1350,13 +1354,13 @@ button {
 }
 
 .history-item {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 70px 1fr auto auto;
     align-items: center;
-    padding: 1rem 0;
+    gap: 0.75rem;
+    padding: 0.9rem 0;
     border-bottom: 1px solid var(--border);
-    font-size: 1rem;
-    min-height: 56px;
+    font-size: 0.95rem;
 }
 
 .history-item:last-child {
@@ -1365,14 +1369,30 @@ button {
 
 .history-routine {
     font-weight: 700;
-    font-size: 1rem;
+    font-size: 0.95rem;
 }
 
 .history-routine.pass-a { color: var(--accent-a); }
 .history-routine.pass-b { color: var(--accent-b); }
 
-.history-date { color: var(--fg-secondary); font-size: 0.9rem; }
-.history-duration { color: var(--fg-muted); font-size: 0.85rem; }
+.history-date { 
+    color: var(--fg-secondary); 
+    font-size: 0.85rem; 
+}
+
+.history-eff { 
+    color: var(--accent-a); 
+    font-size: 0.85rem;
+    text-align: right;
+    min-width: 80px;
+}
+
+.history-duration { 
+    color: var(--fg-muted); 
+    font-size: 0.85rem; 
+    text-align: right;
+    min-width: 50px;
+}
 
 .empty-state {
     text-align: center;
@@ -1873,4 +1893,837 @@ button {
     font-size: 0.8rem;
     color: #00ccff;
     font-variant-numeric: tabular-nums;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DASHBOARD LINKS (Settings + Stats)
+   ═══════════════════════════════════════════════════════════════ */
+
+.settings-gear {
+    position: absolute;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 28px;
+    height: 28px;
+    padding: 4px;
+    color: var(--fg-muted);
+    opacity: 0.5;
+    transition: all 0.2s ease;
+}
+
+.settings-gear:active {
+    opacity: 1;
+    color: var(--fg-secondary);
+}
+
+.settings-gear svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SETTINGS PAGE
+   ═══════════════════════════════════════════════════════════════ */
+
+.settings-container {
+    min-height: 100vh;
+    padding: 0 0 2rem 0;
+    padding-bottom: env(safe-area-inset-bottom, 2rem);
+}
+
+.settings-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.settings-header h1 {
+    font-size: 1.2rem;
+    font-weight: 500;
+}
+
+.settings-section {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.settings-section h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--fg-primary);
+    margin-bottom: 1rem;
+}
+
+.routines-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.routine-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.routine-card.active {
+    border-color: var(--accent-a);
+    background: rgba(0, 255, 136, 0.05);
+}
+
+.routine-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.routine-name {
+    font-weight: 600;
+    color: var(--fg-primary);
+}
+
+.routine-passes {
+    font-size: 0.8rem;
+    color: var(--fg-secondary);
+}
+
+.active-badge {
+    font-size: 0.7rem;
+    color: var(--accent-a);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.routine-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.activate-btn,
+.edit-btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.activate-btn {
+    background: var(--accent-a);
+    color: var(--bg-primary);
+}
+
+.edit-btn {
+    background: var(--bg-secondary);
+    color: var(--fg-secondary);
+    border: 1px solid var(--border);
+}
+
+.create-routine-btn {
+    width: 100%;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    color: var(--fg-secondary);
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+.create-routine-btn:active {
+    border-color: var(--accent-a);
+    color: var(--accent-a);
+}
+
+.account-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.account-email {
+    color: var(--fg-secondary);
+    font-size: 0.9rem;
+}
+
+.logout-btn {
+    padding: 0.5rem 1rem;
+    background: rgba(255, 100, 100, 0.1);
+    border: 1px solid rgba(255, 100, 100, 0.3);
+    border-radius: 6px;
+    color: #ff6666;
+    font-size: 0.85rem;
+}
+
+.empty-routines {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--fg-secondary);
+}
+
+.empty-routines p {
+    margin-bottom: 0.5rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ROUTINE BUILDER
+   ═══════════════════════════════════════════════════════════════ */
+
+.routine-builder {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.builder-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+}
+
+.builder-header h1 {
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+.builder-content {
+    flex: 1;
+    padding: 1rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.builder-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.routine-name-input,
+.routine-focus-input {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--fg-primary);
+    font-family: var(--font);
+    font-size: 1rem;
+}
+
+.routine-name-input:focus,
+.routine-focus-input:focus {
+    outline: none;
+    border-color: var(--accent-a);
+}
+
+.routine-focus-input {
+    font-size: 0.9rem;
+    color: var(--fg-secondary);
+}
+
+.passes-tabs {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+}
+
+.pass-tab {
+    padding: 0.6rem 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg-secondary);
+    font-size: 0.9rem;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.pass-tab.selected {
+    background: var(--accent-a);
+    color: var(--bg-primary);
+    border-color: var(--accent-a);
+}
+
+.add-pass-btn {
+    padding: 0.6rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    color: var(--fg-secondary);
+    font-size: 1rem;
+}
+
+.pass-editor {
+    flex: 1;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.pass-meta-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.pass-meta-edit .field-label {
+    font-size: 0.7rem;
+    color: var(--fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.5rem;
+}
+
+.pass-meta-edit .field-label:first-child {
+    margin-top: 0;
+}
+
+.pass-name-input {
+    width: 100%;
+    max-width: 150px;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg-primary);
+    font-family: var(--font);
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.pass-name-input:focus {
+    outline: none;
+    border-color: var(--accent-a);
+}
+
+.pass-desc-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg-secondary);
+    font-family: var(--font);
+    font-size: 0.85rem;
+}
+
+.pass-desc-input:focus {
+    outline: none;
+    border-color: var(--accent-a);
+    color: var(--fg-primary);
+}
+
+.pass-exercises h3 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--fg-secondary);
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.exercise-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+
+.exercise-item.finisher {
+    border-left: 3px solid var(--accent-b);
+}
+
+.exercise-name {
+    font-weight: 500;
+    color: var(--fg-primary);
+}
+
+.exercise-detail {
+    font-size: 0.85rem;
+    color: var(--fg-secondary);
+}
+
+.add-exercise-btn {
+    width: 100%;
+    padding: 0.75rem;
+    background: transparent;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    color: var(--fg-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+    transition: all 0.2s ease;
+}
+
+.add-exercise-btn:active {
+    border-color: var(--accent-a);
+    color: var(--accent-a);
+}
+
+.save-routine-btn {
+    width: 100%;
+    padding: 1rem;
+    background: var(--accent-a);
+    border-radius: 8px;
+    color: var(--bg-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    margin-top: auto;
+}
+
+.save-routine-btn:disabled {
+    opacity: 0.5;
+}
+
+/* Exercise Search Modal */
+.exercise-search-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 100;
+    padding: 1rem;
+}
+
+.exercise-search-dialog {
+    width: 100%;
+    max-width: 500px;
+    max-height: 80vh;
+    background: var(--bg-card);
+    border-radius: 16px 16px 0 0;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.exercise-search-dialog h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+/* Quick-add finisher section */
+.quick-add-section {
+    margin-bottom: 0.5rem;
+}
+
+.quick-add-label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+    margin-bottom: 0.5rem;
+}
+
+.quick-add-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.quick-add-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.6rem 0.8rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    text-align: left;
+    transition: all 0.15s ease;
+}
+
+.quick-add-btn:active {
+    background: rgba(255, 152, 0, 0.15);
+    border-color: var(--accent-b);
+}
+
+.quick-name {
+    font-weight: 500;
+    color: var(--fg-primary);
+    font-size: 0.85rem;
+}
+
+.quick-detail {
+    font-size: 0.7rem;
+    color: var(--fg-muted);
+    margin-top: 0.15rem;
+}
+
+.search-divider {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+    margin: 0.75rem 0;
+}
+
+.search-box {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.search-box input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--fg-primary);
+    font-family: var(--font);
+    font-size: 1rem;
+}
+
+.search-box input:focus {
+    outline: none;
+    border-color: var(--accent-a);
+}
+
+.search-box button {
+    padding: 0.75rem 1.25rem;
+    background: var(--accent-a);
+    border-radius: 8px;
+    color: var(--bg-primary);
+    font-weight: 600;
+}
+
+.search-box button:disabled {
+    opacity: 0.5;
+}
+
+.search-results {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 40vh;
+}
+
+.search-result-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.search-result-item:active {
+    background: var(--bg-primary);
+}
+
+.result-thumb {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: var(--bg-primary);
+}
+
+.result-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.result-name {
+    font-weight: 500;
+    color: var(--fg-primary);
+}
+
+.result-muscles {
+    font-size: 0.8rem;
+    color: var(--fg-secondary);
+}
+
+.close-search-btn {
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--fg-secondary);
+    font-size: 0.9rem;
+}
+
+/* Superset & Exercise Management */
+.exercise-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+
+.exercise-item.superset {
+    border-left: 3px solid var(--accent-a);
+    background: rgba(0, 200, 83, 0.05);
+}
+
+.exercise-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.superset-badge {
+    font-size: 0.75rem;
+    color: var(--accent-a);
+    background: rgba(0, 200, 83, 0.15);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.link-superset-btn {
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--fg-muted);
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.link-superset-btn:active {
+    border-color: var(--accent-a);
+    color: var(--accent-a);
+}
+
+.remove-exercise-btn {
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--fg-muted);
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.remove-exercise-btn:active {
+    color: #ef4444;
+}
+
+.add-exercise-btn.finisher-btn {
+    border-color: var(--accent-b);
+    color: var(--accent-b);
+}
+
+.add-exercise-btn.finisher-btn:active {
+    background: rgba(255, 152, 0, 0.1);
+}
+
+/* Superset Picker Modal */
+.superset-picker-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 110;
+    padding: 1rem;
+}
+
+.superset-picker-dialog {
+    width: 100%;
+    max-width: 350px;
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.superset-picker-dialog h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.superset-source {
+    text-align: center;
+    color: var(--fg-secondary);
+    font-size: 0.9rem;
+}
+
+.superset-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.superset-option {
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--fg-primary);
+    font-size: 1rem;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.superset-option:active {
+    border-color: var(--accent-a);
+    background: rgba(0, 200, 83, 0.1);
+}
+
+.no-options {
+    text-align: center;
+    color: var(--fg-muted);
+    font-size: 0.9rem;
+    padding: 1rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DYNAMIC PASS BUTTONS
+   ═══════════════════════════════════════════════════════════════ */
+
+.pass-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.pass-buttons .start-btn {
+    width: 100%;
+    max-width: 300px;
+    min-width: 280px;
+}
+
+/* Dynamic button sizing based on pass count */
+.pass-buttons.size-large .start-btn {
+    padding: 1.5rem 2rem;
+}
+.pass-buttons.size-large .start-btn-label {
+    font-size: 1.5rem;
+}
+.pass-buttons.size-large .start-btn-focus {
+    font-size: 0.65rem;
+}
+
+.pass-buttons.size-medium .start-btn {
+    padding: 1.1rem 1.5rem;
+}
+.pass-buttons.size-medium .start-btn-label {
+    font-size: 1.25rem;
+}
+.pass-buttons.size-medium .start-btn-focus {
+    font-size: 0.6rem;
+}
+
+.pass-buttons.size-small .start-btn {
+    padding: 0.8rem 1.2rem;
+}
+.pass-buttons.size-small .start-btn-label {
+    font-size: 1.1rem;
+}
+.pass-buttons.size-small .start-btn-focus {
+    font-size: 0.55rem;
+}
+
+.pass-buttons.size-tiny .start-btn {
+    padding: 0.6rem 1rem;
+}
+.pass-buttons.size-tiny .start-btn-label {
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+}
+.pass-buttons.size-tiny .start-btn-focus {
+    font-size: 0.5rem;
+}
+
+.loading-passes {
+    text-align: center;
+    color: var(--fg-secondary);
+    padding: 2rem;
+}
+
+.no-routine {
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--fg-secondary);
+}
+
+.no-routine p {
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.create-routine-link {
+    padding: 1rem 2rem;
+    background: var(--accent-a);
+    border-radius: 8px;
+    color: var(--bg-primary);
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+/* Dynamic pass colors (cycle through) */
+.start-btn.pass-c {
+    color: #00ccff;
+    border-color: #00ccff;
+}
+.start-btn.pass-c:active {
+    background: #00ccff;
+    color: var(--bg-primary);
+}
+.start-btn.pass-d {
+    color: #ff66cc;
+    border-color: #ff66cc;
+}
+.start-btn.pass-d:active {
+    background: #ff66cc;
+    color: var(--bg-primary);
+}
+.start-btn.pass-e {
+    color: #ffcc00;
+    border-color: #ffcc00;
+}
+.start-btn.pass-e:active {
+    background: #ffcc00;
+    color: var(--bg-primary);
 }

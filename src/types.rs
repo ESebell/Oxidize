@@ -10,6 +10,17 @@ pub struct Exercise {
     pub superset_name: Option<String>,
     pub is_bodyweight: bool,
     pub duration_secs: Option<u32>,  // Some(30) = timed exercise, None = reps-based
+    // Wger API data (optional - for routine builder)
+    #[serde(default)]
+    pub primary_muscles: Vec<String>,
+    #[serde(default)]
+    pub secondary_muscles: Vec<String>,
+    #[serde(default)]
+    pub image_url: Option<String>,
+    #[serde(default)]
+    pub equipment: Option<String>,
+    #[serde(default)]
+    pub wger_id: Option<u32>,
 }
 
 impl Exercise {
@@ -23,6 +34,11 @@ impl Exercise {
             superset_name: None,
             is_bodyweight: false,
             duration_secs: None,
+            primary_muscles: vec![],
+            secondary_muscles: vec![],
+            image_url: None,
+            equipment: None,
+            wger_id: None,
         }
     }
 
@@ -36,6 +52,11 @@ impl Exercise {
             superset_name: ss_name.map(|s| s.to_string()),
             is_bodyweight: false,
             duration_secs: None,
+            primary_muscles: vec![],
+            secondary_muscles: vec![],
+            image_url: None,
+            equipment: None,
+            wger_id: None,
         }
     }
     
@@ -49,6 +70,11 @@ impl Exercise {
             superset_name: None,
             is_bodyweight: true,
             duration_secs: None,
+            primary_muscles: vec![],
+            secondary_muscles: vec![],
+            image_url: None,
+            equipment: None,
+            wger_id: None,
         }
     }
     
@@ -62,6 +88,39 @@ impl Exercise {
             superset_name: None,
             is_bodyweight: true,
             duration_secs: Some(duration),
+            primary_muscles: vec![],
+            secondary_muscles: vec![],
+            image_url: None,
+            equipment: None,
+            wger_id: None,
+        }
+    }
+    
+    /// Create exercise from Wger API data
+    pub fn from_wger(
+        name: &str,
+        sets: u8,
+        reps: &str,
+        primary_muscles: Vec<String>,
+        secondary_muscles: Vec<String>,
+        image_url: Option<String>,
+        equipment: Option<String>,
+        wger_id: u32,
+    ) -> Self {
+        Self {
+            name: name.to_string(),
+            sets,
+            reps_target: reps.to_string(),
+            is_superset: false,
+            superset_with: None,
+            superset_name: None,
+            is_bodyweight: false,
+            duration_secs: None,
+            primary_muscles,
+            secondary_muscles,
+            image_url,
+            equipment,
+            wger_id: Some(wger_id),
         }
     }
 }
@@ -146,6 +205,31 @@ pub enum AppView {
     Dashboard,
     Workout(String),
     Stats,
+    Settings,
+    RoutineBuilder(Option<String>), // Some(id) = editing, None = new
+}
+
+/// Stored routine in Supabase
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct SavedRoutine {
+    pub id: String,
+    #[serde(default)]
+    pub user_id: Option<String>,
+    pub name: String,
+    pub focus: String,
+    pub passes: Vec<Pass>,
+    pub is_active: bool,
+    pub created_at: i64,
+}
+
+/// A single pass within a routine (e.g., "Pass A")
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Pass {
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    pub exercises: Vec<Exercise>,
+    pub finishers: Vec<Exercise>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
