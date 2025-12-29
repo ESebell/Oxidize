@@ -75,6 +75,7 @@ fn parse_target_reps(target: &str) -> u8 {
 
 #[component]
 pub fn App() -> impl IntoView {
+    web_sys::console::log_1(&"🚀 OXIDIZE STARTING - VERSION: MOLNSYNC_FIX_3".into());
     // Check if user is already logged in
     let initial_view = if supabase::load_auth_session().is_some() {
         AppView::Dashboard

@@ -1038,10 +1038,11 @@ struct UserSettingsRow {
 /// Save display name to Supabase (fire-and-forget)
 pub fn save_display_name_to_cloud(name: &str) {
     let name = name.to_string();
+    web_sys::console::log_1(&format!("Preparing to save name: {}", name).into());
     update_last_activity();
     wasm_bindgen_futures::spawn_local(async move {
         if let Err(e) = save_display_name_async(&name).await {
-            web_sys::console::log_1(&format!("Supabase display_name save failed: {:?}", e).into());
+            web_sys::console::log_1(&format!("❌ Supabase display_name save failed: {:?}", e).into());
         }
     });
 }
@@ -1050,6 +1051,8 @@ async fn save_display_name_async(name: &str) -> Result<(), JsValue> {
     let window = web_sys::window().ok_or("no window")?;
     let user_id = get_current_user_id().ok_or("Not logged in")?;
     
+    web_sys::console::log_1(&format!("☁️ Saving name to cloud for user {}: '{}'", user_id, name).into());
+    
     let row = UserSettingsRow {
         user_id: user_id.clone(),
         display_name: if name.is_empty() { None } else { Some(name.to_string()) },
@@ -1057,12 +1060,14 @@ async fn save_display_name_async(name: &str) -> Result<(), JsValue> {
     
     let body = serde_json::to_string(&row).map_err(|e| e.to_string())?;
     
-    let headers = get_headers()?;
-    headers.set("Prefer", "resolution=merge-duplicates")?;
+    let headers = get_headers().map_err(|_| "Failed to get headers")?;
+    // Explicitly set the Prefer header for UPSERT
+    headers.set("Prefer", "resolution=merge-duplicates").map_err(|_| "Failed to set Prefer header")?;
     
     let opts = create_request_init("POST", Some(&body), &headers);
     
-    let url = format!("{}/rest/v1/user_settings", SUPABASE_URL);
+    // Add on_conflict parameter to be extra safe with PostgREST
+    let url = format!("{}/rest/v1/user_settings?on_conflict=user_id", SUPABASE_URL);
     let request = Request::new_with_str_and_init(&url, &opts)?;
     
     let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
@@ -1071,11 +1076,11 @@ async fn save_display_name_async(name: &str) -> Result<(), JsValue> {
     if !resp.ok() {
         let status = resp.status();
         let text = JsFuture::from(resp.text()?).await?.as_string().unwrap_or_default();
-        web_sys::console::log_1(&format!("Supabase error saving name ({}): {}", status, text).into());
+        web_sys::console::log_1(&format!("❌ Supabase error saving name ({}): {}", status, text).into());
         return Err(format!("HTTP {}: {}", status, text).into());
     }
     
-    web_sys::console::log_1(&"Display name saved to cloud".into());
+    web_sys::console::log_1(&"✅ Display name successfully saved to Supabase!".into());
     Ok(())
 }
 
