@@ -1782,11 +1782,13 @@ fn Settings(
     });
     
     let save_display_name = move |_| {
+        web_sys::console::log_1(&"SAVE BUTTON CLICKED!".into());
         let name = name_input.get();
         set_display_name.set(name.clone());
         storage::save_display_name(&name);
         
         // Sync to Supabase (cloud)
+        web_sys::console::log_1(&format!("Calling Supabase with name: {}", name).into());
         supabase::save_display_name_to_cloud(&name);
         
         // Update auth session with new display name
