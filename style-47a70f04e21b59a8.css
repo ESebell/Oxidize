@@ -1622,7 +1622,7 @@ button {
 .weight-line {
     fill: none;
     stroke: var(--accent-a);
-    stroke-width: 2; /* Thinner, cleaner line */
+    stroke-width: 0.8; /* Reeeeally thin and clean */
     stroke-linecap: round;
     stroke-linejoin: round;
 }
@@ -1630,7 +1630,7 @@ button {
 .weight-point {
     fill: var(--accent-a);
     stroke: var(--bg-card);
-    stroke-width: 1.5;
+    stroke-width: 0.5;
 }
 
 .weight-stats-row {
