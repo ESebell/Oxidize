@@ -622,7 +622,7 @@ async fn save_bodyweight_async(weight: f64) -> Result<(), JsValue> {
     
     let timestamp = js_sys::Date::now() as i64 / 1000;
     
-    // 1. Save to history table (bodyweight)
+    // 1. Save to history table (bodyweight) - this is for the curve
     let history_body = format!(r#"{{"weight": {}, "timestamp": {}, "user_id": "{}"}}"#, weight, timestamp, user_id);
     let headers = get_headers()?;
     let opts = create_request_init("POST", Some(&history_body), &headers);
@@ -630,10 +630,11 @@ async fn save_bodyweight_async(weight: f64) -> Result<(), JsValue> {
     let request = Request::new_with_str_and_init(&url, &opts)?;
     let _ = JsFuture::from(window.fetch_with_request(&request)).await?;
 
-    // 2. Save to settings table (user_settings) for current weight
+    // 2. Save to settings table (user_settings) for CURRENT weight
+    // Create a row with ONLY user_id and bodyweight to avoid clobbering display_name
     let settings_row = UserSettingsRow {
         user_id: user_id.clone(),
-        display_name: crate::storage::load_display_name(),
+        display_name: None, // Will be skipped during serialization
         bodyweight: Some(weight),
     };
     let settings_body = serde_json::to_string(&settings_row).map_err(|e| e.to_string())?;
@@ -1047,11 +1048,13 @@ pub fn create_default_routine() -> SavedRoutine {
 #[derive(Serialize, Deserialize, Debug)]
 struct UserSettingsRow {
     user_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     display_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     bodyweight: Option<f64>,
 }
 
-/// Save display name to Supabase (fire-and-forget)
+/// Save display name to Supabase (partial update)
 pub fn save_display_name_to_cloud(name: &str) {
     let name = name.to_string();
     update_last_activity();
@@ -1066,14 +1069,11 @@ async fn save_display_name_async(name: &str) -> Result<(), JsValue> {
     let window = web_sys::window().ok_or("no window")?;
     let user_id = get_current_user_id().ok_or("Not logged in")?;
     
-    // Get current weight from local cache to keep it during name update
-    let db = crate::storage::load_data();
-    let current_bw = db.get_bodyweight();
-
+    // Create a row with ONLY user_id and display_name to avoid clobbering bodyweight
     let row = UserSettingsRow {
         user_id: user_id.clone(),
-        display_name: if name.is_empty() { None } else { Some(name.to_string()) },
-        bodyweight: current_bw,
+        display_name: Some(if name.is_empty() { " ".to_string() } else { name.to_string() }),
+        bodyweight: None, // Will be skipped during serialization
     };
     
     let body = serde_json::to_string(&row).map_err(|e| e.to_string())?;
@@ -1081,7 +1081,6 @@ async fn save_display_name_async(name: &str) -> Result<(), JsValue> {
     headers.set("Prefer", "resolution=merge-duplicates").map_err(|_| "Failed to set Prefer header")?;
     
     let opts = create_request_init("POST", Some(&body), &headers);
-    
     let url = format!("{}/rest/v1/user_settings", SUPABASE_URL);
     let request = Request::new_with_str_and_init(&url, &opts)?;
     
@@ -1091,9 +1090,8 @@ async fn save_display_name_async(name: &str) -> Result<(), JsValue> {
     if resp.ok() {
         Ok(())
     } else {
-        let status = resp.status();
         let text = JsFuture::from(resp.text()?).await?.as_string().unwrap_or_default();
-        Err(format!("HTTP {}: {}", status, text).into())
+        Err(format!("HTTP {}: {}", resp.status(), text).into())
     }
 }
 
