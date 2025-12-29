@@ -1373,12 +1373,12 @@ fn WeightChart(history: Vec<crate::storage::BodyweightEntry>) -> impl IntoView {
                     let x = get_x(h.timestamp);
                     let y = get_y(h.weight);
                     view! {
-                        <circle cx=x cy=y r="2.5" class="weight-point" />
+                        <circle cx=x cy=y r="3.5" class="weight-point" />
                         {if idx == 0 || idx == data.len() - 1 || h.weight == max_w || h.weight == min_w {
                             // Alternate label position to prevent overlap
-                            let y_off = if idx % 2 == 0 { -6.0 } else { 8.0 };
+                            let y_off = if idx % 2 == 0 { -8.0 } else { 12.0 };
                             view! {
-                                <text x=x y={y + y_off} font-size="5" fill="var(--fg-primary)" text-anchor="middle" font-family="var(--font)" font-weight="700">
+                                <text x=x y={y + y_off} font-size="8" fill="var(--fg-primary)" text-anchor="middle" font-family="var(--font)" font-weight="700">
                                     {format!("{:.1}", h.weight)}
                                 </text>
                             }.into_view()
@@ -1538,29 +1538,6 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                         <div class="ptw-hint">"Total styrka (Big 4) delat med kroppsvikt"</div>
                     </div>
                 </div>
-
-                // ═══════════════════════════════════════════════════════════════
-                // 3. WEIGHT CURVE
-                // ═══════════════════════════════════════════════════════════════
-                <div class="stat-card">
-                    <div class="stat-card-title">"Viktutveckling"</div>
-                    {move || {
-                        let _ = data_version.get();
-                        let db = storage::load_data();
-                        view! { <WeightChart history=db.bodyweight_history /> }
-                    }}
-                    <div class="bodyweight-ref">
-                        {move || {
-                            let bw = bodyweight.get();
-                            let bw_display = bw.map(|w| format!("{:.1}", w)).unwrap_or("--.-".to_string());
-                            view! {
-                                <span class="bw-label">"Nuvarande vikt: "</span>
-                                <span class="bw-value">{bw_display}</span>
-                                <span class="bw-kg">" kg"</span>
-                            }
-                        }}
-                    </div>
-                </div>
                 
                 // ═══════════════════════════════════════════════════════════════
                 // 3. EFFICIENCY (kg/min)
@@ -1690,6 +1667,29 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                         <span class="heat-2">"Ok"</span>
                         <span class="heat-3">"Bra"</span>
                         <span class="heat-4">"Hög"</span>
+                    </div>
+                </div>
+
+                // ═══════════════════════════════════════════════════════════════
+                // 6. WEIGHT CURVE (Moved below heatmap)
+                // ═══════════════════════════════════════════════════════════════
+                <div class="stat-card weight-card-new">
+                    <div class="stat-card-title">"Viktutveckling"</div>
+                    {move || {
+                        let _ = data_version.get();
+                        let db = storage::load_data();
+                        view! { <WeightChart history=db.bodyweight_history /> }
+                    }}
+                    <div class="bodyweight-ref">
+                        {move || {
+                            let bw = bodyweight.get();
+                            let bw_display = bw.map(|w| format!("{:.1}", w)).unwrap_or("--.-".to_string());
+                            view! {
+                                <span class="bw-label">"Nuvarande vikt: "</span>
+                                <span class="bw-value">{bw_display}</span>
+                                <span class="bw-kg">" kg"</span>
+                            }
+                        }}
                     </div>
                 </div>
                 
