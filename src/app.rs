@@ -1367,19 +1367,22 @@ fn WeightChart(history: Vec<crate::storage::BodyweightEntry>) -> impl IntoView {
     view! {
         <div class="weight-chart-container">
             <svg viewBox=format!("0 0 {} {}", width, height) class="weight-chart-svg">
-                // Subtle horizontal grid lines
-                <line x1=padding y1={get_y(min_val)} x2={width-padding} y2={get_y(min_val)} stroke="#222" stroke-width="0.5" stroke-dasharray="2,2" />
-                <line x1=padding y1={get_y(max_val)} x2={width-padding} y2={get_y(max_val)} stroke="#222" stroke-width="0.5" stroke-dasharray="2,2" />
+                // Subtle horizontal grid lines with weight labels
+                <line x1=padding y1={get_y(min_val)} x2={width-padding} y2={get_y(min_val)} stroke="#222" stroke-width="0.3" stroke-dasharray="1,1" />
+                <text x={padding - 2.0} y={get_y(min_val) + 1.0} font-size="3" fill="#666" text-anchor="end" font-family="var(--font)">{format!("{:.0}", min_val)}</text>
                 
-                // The line (thinner now)
+                <line x1=padding y1={get_y(max_val)} x2={width-padding} y2={get_y(max_val)} stroke="#222" stroke-width="0.3" stroke-dasharray="1,1" />
+                <text x={padding - 2.0} y={get_y(max_val) + 1.0} font-size="3" fill="#666" text-anchor="end" font-family="var(--font)">{format!("{:.0}", max_val)}</text>
+                
+                // The line (much thinner)
                 <polyline points=points class="weight-line" />
                 
                 // Only first and last points
                 {let first = data.first().unwrap();
                  let last = data.last().unwrap();
                  view! {
-                    <circle cx={get_x(first.timestamp)} cy={get_y(first.weight)} r="1.5" class="weight-point" />
-                    <circle cx={get_x(last.timestamp)} cy={get_y(last.weight)} r="1.5" class="weight-point" />
+                    <circle cx={get_x(first.timestamp)} cy={get_y(first.weight)} r="1.0" class="weight-point" />
+                    <circle cx={get_x(last.timestamp)} cy={get_y(last.weight)} r="1.0" class="weight-point" />
                  }}
             </svg>
             
