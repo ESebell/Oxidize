@@ -42,14 +42,19 @@ The JSON must strictly follow this structure:
 }
 
 Rules:
-1. 'reps_target' can be "5", "8-10", or "30 sek".
-2. SUPERSETS MUST BE IN PAIRS! If you create a superset:
-   - Exercise A must have: "is_superset": true, "superset_with": "Exercise B"
-   - Exercise B must have: "is_superset": true, "superset_with": "Exercise A"
-   - Both exercises must be consecutive in the array.
-   - A single exercise can NEVER be a superset alone!
+1. 'reps_target' can be "5", "8-10", "12-15", or "30 sek" for timed exercises.
+2. SUPERSETS - IMPORTANT:
+   - A superset is TWO exercises performed back-to-back with no rest between them.
+   - Only use supersets to SAVE TIME in passes with 5+ exercises.
+   - Pair exercises for ANTAGONIST muscles (biceps+triceps, chest+back, quads+hamstrings).
+   - If user doesn't want supersets, set is_superset: false for ALL exercises.
+   - If you DO create a superset, BOTH exercises MUST be marked:
+     * Exercise A: "is_superset": true, "superset_with": "Exercise B"
+     * Exercise B: "is_superset": true, "superset_with": "Exercise A"
+   - Never create a superset with only ONE exercise marked!
 3. 'name' in 'passes' must be max 8 chars (e.g., "PASS A", "BEN", "PUSH").
-4. RESPOND ONLY WITH THE RAW JSON. NO MARKDOWN OR EXPLANATIONS."#;
+4. Each pass should have 4-8 exercises depending on session duration requested.
+5. RESPOND ONLY WITH THE RAW JSON. NO MARKDOWN OR EXPLANATIONS."#;
 
 fn format_time(secs: i64) -> String {
     let mins = secs / 60;
@@ -2269,31 +2274,37 @@ fn RoutineBuilder(
                                     // Clean up broken supersets - if an exercise claims to be
                                     // a superset but its partner isn't properly marked, remove the superset flag
                                     for pass in &mut resp.passes {
-                                        let exercise_names: Vec<String> = pass.exercises.iter()
-                                            .map(|e| e.name.clone())
-                                            .collect();
-                                        
-                                        for exercise in &mut pass.exercises {
-                                            if exercise.is_superset {
-                                                if let Some(partner_name) = &exercise.superset_with {
-                                                    // Check if partner exists and is also marked as superset pointing back
+                                        // First, collect info about which exercises have valid superset partners
+                                        let valid_supersets: Vec<(String, bool)> = pass.exercises.iter()
+                                            .map(|ex| {
+                                                if !ex.is_superset {
+                                                    return (ex.name.clone(), true); // Not a superset, always valid
+                                                }
+                                                if let Some(partner_name) = &ex.superset_with {
+                                                    // Check if partner exists and points back
                                                     let partner_valid = pass.exercises.iter()
                                                         .any(|e| &e.name == partner_name 
                                                              && e.is_superset 
-                                                             && e.superset_with.as_ref() == Some(&exercise.name));
-                                                    
-                                                    if !partner_valid {
-                                                        // Partner doesn't exist or isn't properly linked - remove superset
-                                                        web_sys::console::log_1(&format!(
-                                                            "Removing broken superset from '{}' (partner '{}' not valid)",
-                                                            exercise.name, partner_name
-                                                        ).into());
-                                                        exercise.is_superset = false;
-                                                        exercise.superset_with = None;
-                                                    }
+                                                             && e.superset_with.as_ref() == Some(&ex.name));
+                                                    (ex.name.clone(), partner_valid)
                                                 } else {
-                                                    // is_superset true but no partner specified - remove
+                                                    (ex.name.clone(), false) // is_superset but no partner
+                                                }
+                                            })
+                                            .collect();
+                                        
+                                        // Now fix the invalid ones
+                                        for exercise in &mut pass.exercises {
+                                            if let Some((_, is_valid)) = valid_supersets.iter()
+                                                .find(|(name, _)| name == &exercise.name) 
+                                            {
+                                                if !is_valid && exercise.is_superset {
+                                                    web_sys::console::log_1(&format!(
+                                                        "Removing broken superset from '{}'",
+                                                        exercise.name
+                                                    ).into());
                                                     exercise.is_superset = false;
+                                                    exercise.superset_with = None;
                                                 }
                                             }
                                         }
