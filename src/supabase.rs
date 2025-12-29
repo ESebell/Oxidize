@@ -1121,3 +1121,124 @@ pub async fn fetch_display_name() -> Result<Option<String>, JsValue> {
     
     Ok(rows.first().and_then(|r| r.display_name.clone()))
 }
+
+// ============ AI AGENT ============
+
+#[derive(Deserialize)]
+struct ConfigRow {
+    config_value: String,
+}
+
+pub async fn fetch_api_key() -> Result<Option<String>, JsValue> {
+    let window = web_sys::window().ok_or("no window")?;
+    let headers = get_headers()?;
+    let opts = create_request_init("GET", None, &headers);
+    
+    let url = format!("{}/rest/v1/app_config?config_key=eq.gemini_api_key&select=config_value", SUPABASE_URL);
+    let request = Request::new_with_str_and_init(&url, &opts)?;
+    
+    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
+    let resp: Response = resp_value.dyn_into()?;
+    
+    if !resp.ok() {
+        return Ok(None);
+    }
+    
+    let json = JsFuture::from(resp.json()?).await?;
+    let rows: Vec<ConfigRow> = serde_wasm_bindgen::from_value(json).unwrap_or_default();
+    
+    Ok(rows.first().map(|r| r.config_value.clone()))
+}
+
+#[derive(Serialize)]
+struct GeminiRequest {
+    contents: Vec<GeminiContent>,
+    #[serde(rename = "generationConfig")]
+    generation_config: GeminiGenerationConfig,
+}
+
+#[derive(Serialize)]
+struct GeminiContent {
+    parts: Vec<GeminiPart>,
+}
+
+#[derive(Serialize)]
+struct GeminiPart {
+    text: String,
+}
+
+#[derive(Serialize)]
+struct GeminiGenerationConfig {
+    #[serde(rename = "responseMimeType")]
+    response_mime_type: String,
+}
+
+#[derive(Deserialize)]
+struct GeminiResponse {
+    candidates: Vec<GeminiCandidate>,
+}
+
+#[derive(Deserialize)]
+struct GeminiCandidate {
+    content: GeminiContentResp,
+}
+
+#[derive(Deserialize)]
+struct GeminiContentResp {
+    parts: Vec<GeminiPartResp>,
+}
+
+#[derive(Deserialize)]
+struct GeminiPartResp {
+    text: String,
+}
+
+pub async fn call_gemini(api_key: &str, system_prompt: &str, user_prompt: &str) -> Result<String, JsValue> {
+    let window = web_sys::window().ok_or("no window")?;
+    
+    let full_prompt = format!("{}\n\nUser request: {}", system_prompt, user_prompt);
+    
+    let req_body = GeminiRequest {
+        contents: vec![GeminiContent {
+            parts: vec![GeminiPart { text: full_prompt }],
+        }],
+        generation_config: GeminiGenerationConfig {
+            response_mime_type: "application/json".to_string(),
+        },
+    };
+    
+    let body_str = serde_json::to_string(&req_body).map_err(|e| e.to_string())?;
+    
+    let headers = Headers::new()?;
+    headers.set("Content-Type", "application/json")?;
+    
+    let opts = RequestInit::new();
+    opts.set_method("POST");
+    opts.set_headers(&headers);
+    opts.set_body(&JsValue::from_str(&body_str));
+    
+    let url = format!(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={}",
+        api_key
+    );
+    
+    let request = Request::new_with_str_and_init(&url, &opts)?;
+    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
+    let resp: Response = resp_value.dyn_into()?;
+    
+    if !resp.ok() {
+        let text = JsFuture::from(resp.text()?).await?.as_string().unwrap_or_default();
+        return Err(format!("Gemini API error ({}): {}", resp.status(), text).into());
+    }
+    
+    let json = JsFuture::from(resp.json()?).await?;
+    let gemini_resp: GeminiResponse = serde_wasm_bindgen::from_value(json)
+        .map_err(|e| format!("Failed to parse Gemini response: {:?}", e))?;
+    
+    let response_text = gemini_resp.candidates.first()
+        .and_then(|c| c.content.parts.first())
+        .map(|p| p.text.clone())
+        .ok_or("Empty response from Gemini")?;
+        
+    Ok(response_text)
+}

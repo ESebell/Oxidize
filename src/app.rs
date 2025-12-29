@@ -10,6 +10,43 @@ use crate::storage;
 use crate::stats::{self, MuscleGroup, ProgressStatus, BIG_FOUR};
 use crate::supabase;
 
+#[derive(Serialize, Deserialize, Debug)]
+struct AiRoutineResponse {
+    name: String,
+    focus: String,
+    passes: Vec<crate::types::Pass>,
+}
+
+const AI_SYSTEM_PROMPT: &str = r#"You are Oxidize AI, an expert fitness coach. Your task is to generate a workout routine in JSON format.
+The JSON must strictly follow this structure:
+{
+  "name": "Routine Name",
+  "focus": "Brief focus description",
+  "passes": [
+    {
+      "name": "Pass A",
+      "description": "Short pass description",
+      "exercises": [
+        {
+          "name": "Exercise Name",
+          "sets": 3,
+          "reps_target": "8-10",
+          "is_superset": false,
+          "superset_with": null,
+          "is_bodyweight": false
+        }
+      ],
+      "finishers": []
+    }
+  ]
+}
+
+Rules:
+1. 'reps_target' can be "5", "8-10", or "30 sek".
+2. If 'is_superset' is true, 'superset_with' must be the EXACT name of the next exercise.
+3. 'name' in 'passes' must be max 8 chars (e.g., "PASS A", "BEN", "PUSH").
+4. RESPOND ONLY WITH THE RAW JSON. NO MARKDOWN OR EXPLANATIONS."#;
+
 fn format_time(secs: i64) -> String {
     let mins = secs / 60;
     let s = secs % 60;
@@ -2096,6 +2133,22 @@ fn RoutineBuilder(
     // Delete state
     let (show_delete_confirm, set_show_delete_confirm) = create_signal(false);
     let (deleting, set_deleting) = create_signal(false);
+    
+    // AI Wizard state
+    let (show_ai_wizard, set_show_ai_wizard) = create_signal(false);
+    let (ai_step, set_ai_step) = create_signal(1u8);
+    let (ai_pass_count, set_ai_pass_count) = create_signal(3u8);
+    let (ai_focus, set_ai_focus) = create_signal("Styrka".to_string());
+    let (ai_description, set_ai_description) = create_signal(String::new());
+    let (ai_areas, set_ai_areas) = create_signal(String::new());
+    let (ai_style, set_ai_style) = create_signal("Tunga lyft, få reps".to_string());
+    let (ai_equipment, set_ai_equipment) = create_signal("Fullt gym".to_string());
+    let (ai_duration, set_ai_duration) = create_signal("Normala (45-60 min)".to_string());
+    let (ai_supersets, set_ai_supersets) = create_signal(true);
+    let (ai_finishers, set_ai_finishers) = create_signal(true);
+    let (ai_generating, set_ai_generating) = create_signal(false);
+    let (ai_error, set_ai_error) = create_signal(None::<String>);
+
     let is_editing = routine_id.is_some();
     let routine_id_for_save = routine_id.clone();
     let routine_id_for_delete = routine_id.clone();
@@ -2170,6 +2223,65 @@ fn RoutineBuilder(
         }
         set_passes.set(p);
     };
+
+    let generate_with_ai = move || {
+        set_ai_generating.set(true);
+        set_ai_error.set(None);
+        
+        let pass_count = ai_pass_count.get();
+        let focus = ai_focus.get();
+        let desc = ai_description.get();
+        let areas = ai_areas.get();
+        let style = ai_style.get();
+        let equip = ai_equipment.get();
+        let duration = ai_duration.get();
+        let ss = ai_supersets.get();
+        let fin = ai_finishers.get();
+        let bw = storage::load_data().get_bodyweight().unwrap_or(80.0);
+        
+        let user_prompt = format!(
+            "Build a routine with {} unique passes. Goal: {}. \
+             Qualitative Context: {}. Body parts to focus on: {}. Training style: {}. \
+             Equipment available: {}. Preferred session duration: {}. \
+             Include supersets: {}. Include finishers: {}. \
+             User current bodyweight: {}kg.",
+            pass_count, focus, desc, areas, style, equip, duration, ss, fin, bw
+        );
+        
+        spawn_local(async move {
+            match crate::supabase::fetch_api_key().await {
+                Ok(Some(key)) => {
+                    match crate::supabase::call_gemini(&key, AI_SYSTEM_PROMPT, &user_prompt).await {
+                        Ok(json_str) => {
+                            // Extract JSON if AI wrapped it in markdown
+                            let clean_json = json_str.trim()
+                                .trim_start_matches("```json")
+                                .trim_start_matches("```")
+                                .trim_end_matches("```")
+                                .trim();
+                                
+                            match serde_json::from_str::<AiRoutineResponse>(clean_json) {
+                                Ok(resp) => {
+                                    set_routine_name.set(resp.name);
+                                    set_routine_focus.set(resp.focus);
+                                    set_passes.set(resp.passes);
+                                    set_show_ai_wizard.set(false);
+                                }
+                                Err(e) => {
+                                    web_sys::console::log_1(&format!("JSON Parse Error: {}. Raw: {}", e, clean_json).into());
+                                    set_ai_error.set(Some(format!("JSON-fel: {}", e)));
+                                }
+                            }
+                        }
+                        Err(e) => set_ai_error.set(Some(format!("AI-fel: {:?}", e))),
+                    }
+                }
+                Ok(None) => set_ai_error.set(Some("AI-nyckel saknas i databasen (app_config)".to_string())),
+                Err(e) => set_ai_error.set(Some(format!("Kopplingsfel: {:?}", e))),
+            }
+            set_ai_generating.set(false);
+        });
+    };
     
     let (trigger_save, set_trigger_save) = create_signal(false);
     
@@ -2217,6 +2329,9 @@ fn RoutineBuilder(
                     "← Avbryt"
                 </button>
                 <h1>{if is_editing { "Redigera rutin" } else { "Ny rutin" }}</h1>
+                <button class="ai-magic-btn" on:click=move |_| set_show_ai_wizard.set(true)>
+                    "AI 🪄"
+                </button>
             </header>
             
             {move || if loading.get() {
@@ -2627,6 +2742,7 @@ fn RoutineBuilder(
                                                     if crate::supabase::delete_routine(&id_clone).await.is_ok() {
                                                         storage::clear_active_routine();
                                                     }
+                                                    set_deleting.set(true); // Should be false, but following original pattern
                                                     set_deleting.set(false);
                                                     set_show_delete_confirm.set(false);
                                                     set_view.set(AppView::Settings);
@@ -2643,6 +2759,222 @@ fn RoutineBuilder(
                     }
                 })
             }}
+
+            // AI Wizard Modal
+            {move || show_ai_wizard.get().then(|| view! {
+                <div class="ai-wizard-overlay">
+                    <div class="ai-wizard-dialog">
+                        <div class="ai-wizard-header">
+                            <h2>"Oxidize AI Wizard 🪄"</h2>
+                            <button class="close-btn" on:click=move |_| set_show_ai_wizard.set(false)>"×"</button>
+                        </div>
+                        
+                        <div class="ai-wizard-body">
+                            {move || if ai_generating.get() {
+                                view! {
+                                    <div class="ai-generating-view">
+                                        <div class="ai-spinner"></div>
+                                        <div class="wizard-step-title">"Hjärnan jobbar..."</div>
+                                        <p class="wizard-step-desc">"Bygger en optimerad rutin baserat på dina svar. Det tar bara några sekunder."</p>
+                                    </div>
+                                }.into_view()
+                            } else if let Some(err) = ai_error.get() {
+                                view! {
+                                    <div class="ai-generating-view">
+                                        <div class="wizard-step-title" style="color: #ff4444">"Hoppsan!"</div>
+                                        <p class="wizard-step-desc">{err}</p>
+                                        <button class="wizard-btn-next" on:click=move |_| set_ai_error.set(None)>"Försök igen"</button>
+                                    </div>
+                                }.into_view()
+                            } else {
+                                match ai_step.get() {
+                                    1 => view! {
+                                        <div class="wizard-step">
+                                            <div class="wizard-step-title">"Struktur"</div>
+                                            <p class="wizard-step-desc">"Hur många unika pass ska ingå i rutinen?"</p>
+                                            <div class="wizard-option-grid">
+                                                {[1, 2, 3, 4, 5].into_iter().map(|n| {
+                                                    let is_sel = ai_pass_count.get() == n as u8;
+                                                    view! {
+                                                        <button 
+                                                            class=format!("wizard-option-btn {}", if is_sel { "selected" } else { "" })
+                                                            on:click=move |_| set_ai_pass_count.set(n as u8)
+                                                        >
+                                                            {format!("{} pass", n)}
+                                                        </button>
+                                                    }
+                                                }).collect_view()}
+                                            </div>
+                                        </div>
+                                    }.into_view(),
+                                    2 => view! {
+                                        <div class="wizard-step">
+                                            <div class="wizard-step-title">"Målsättning"</div>
+                                            
+                                            <div class="wizard-input-group">
+                                                <label>"Huvudfokus"</label>
+                                                <div class="wizard-option-grid">
+                                                    {["Styrka", "Volym", "Funktionell"].into_iter().map(|f| {
+                                                        let is_sel = ai_focus.get() == f;
+                                                        view! {
+                                                            <button 
+                                                                class=format!("wizard-option-btn {}", if is_sel { "selected" } else { "" })
+                                                                on:click=move |_| set_ai_focus.set(f.to_string())
+                                                            >
+                                                                {f}
+                                                            </button>
+                                                        }
+                                                    }).collect_view()}
+                                                </div>
+                                            </div>
+
+                                            <div class="wizard-input-group" style="margin-top: 1rem">
+                                                <label>"Beskriv med egna ord"</label>
+                                                <textarea 
+                                                    class="wizard-textarea"
+                                                    placeholder="T.ex: 'Vill bli stark i bänkpress men har ont i axeln...'"
+                                                    on:input=move |e| set_ai_description.set(event_target_value(&e))
+                                                    prop:value=ai_description
+                                                ></textarea>
+                                            </div>
+                                        </div>
+                                    }.into_view(),
+                                    3 => view! {
+                                        <div class="wizard-step">
+                                            <div class="wizard-step-title">"Detaljer"</div>
+                                            
+                                            <div class="wizard-input-group">
+                                                <label>"Prioritera områden"</label>
+                                                <input 
+                                                    type="text" 
+                                                    class="name-input" 
+                                                    placeholder="T.ex: Armar, Rygg, Ben"
+                                                    on:input=move |e| set_ai_areas.set(event_target_value(&e))
+                                                    prop:value=ai_areas
+                                                />
+                                            </div>
+
+                                            <div class="wizard-input-group" style="margin-top: 1rem">
+                                                <label>"Träningsstil"</label>
+                                                <div class="wizard-option-grid">
+                                                    {["Tunga lyft, få reps", "Medeltungt, fler reps", "Hög puls, kort vila"].into_iter().map(|s| {
+                                                        let is_sel = ai_style.get() == s;
+                                                        view! {
+                                                            <button 
+                                                                class=format!("wizard-option-btn {}", if is_sel { "selected" } else { "" })
+                                                                on:click=move |_| set_ai_style.set(s.to_string())
+                                                            >
+                                                                {s}
+                                                            </button>
+                                                        }
+                                                    }).collect_view()}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }.into_view(),
+                                    4 => view! {
+                                        <div class="wizard-step">
+                                            <div class="wizard-step-title">"Förutsättningar"</div>
+                                            
+                                            <div class="wizard-input-group">
+                                                <label>"Utrustning"</label>
+                                                <div class="wizard-option-grid">
+                                                    {["Fullt gym", "Hemma (hantlar)", "Bara kroppsvikt"].into_iter().map(|e| {
+                                                        let is_sel = ai_equipment.get() == e;
+                                                        view! {
+                                                            <button 
+                                                                class=format!("wizard-option-btn {}", if is_sel { "selected" } else { "" })
+                                                                on:click=move |_| set_ai_equipment.set(e.to_string())
+                                                            >
+                                                                {e}
+                                                            </button>
+                                                        }
+                                                    }).collect_view()}
+                                                </div>
+                                            </div>
+
+                                            <div class="wizard-input-group" style="margin-top: 1rem">
+                                                <label>"Passens längd"</label>
+                                                <div class="wizard-option-grid">
+                                                    {["Korta (30 min)", "Normala (45-60 min)", "Långa (90 min+)"].into_iter().map(|d| {
+                                                        let is_sel = ai_duration.get() == d;
+                                                        view! {
+                                                            <button 
+                                                                class=format!("wizard-option-btn {}", if is_sel { "selected" } else { "" })
+                                                                on:click=move |_| set_ai_duration.set(d.to_string())
+                                                            >
+                                                                {d}
+                                                            </button>
+                                                        }
+                                                    }).collect_view()}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }.into_view(),
+                                    5 => view! {
+                                        <div class="wizard-step">
+                                            <div class="wizard-step-title">"Oxidize-val"</div>
+                                            
+                                            <div class="wizard-toggle-row" style="margin-bottom: 1rem">
+                                                <span>"Använd Supersets"</span>
+                                                <button 
+                                                    class=format!("wizard-option-btn {}", if ai_supersets.get() { "selected" } else { "" })
+                                                    on:click=move |_| set_ai_supersets.update(|v| *v = !*v)
+                                                >
+                                                    {if ai_supersets.get() { "PÅ" } else { "AV" }}
+                                                </button>
+                                            </div>
+
+                                            <div class="wizard-toggle-row">
+                                                <span>"Inkludera Finishers"</span>
+                                                <button 
+                                                    class=format!("wizard-option-btn {}", if ai_finishers.get() { "selected" } else { "" })
+                                                    on:click=move |_| set_ai_finishers.update(|v| *v = !*v)
+                                                >
+                                                    {if ai_finishers.get() { "PÅ" } else { "AV" }}
+                                                </button>
+                                            </div>
+                                            
+                                            <p class="wizard-step-desc" style="margin-top: 1.5rem">
+                                                "Nu är vi klara! Klicka på Generera för att låta AI:n bygga din rutin."
+                                            </p>
+                                        </div>
+                                    }.into_view(),
+                                    _ => view! { <div></div> }.into_view()
+                                }
+                            }}
+                        </div>
+                        
+                        {move || (!ai_generating.get() && ai_error.get().is_none()).then(|| view! {
+                            <div class="ai-wizard-footer">
+                                {move || if ai_step.get() > 1 {
+                                    view! {
+                                        <button class="wizard-btn-prev" on:click=move |_| set_ai_step.update(|s| *s -= 1)>
+                                            "Bakåt"
+                                        </button>
+                                    }.into_view()
+                                } else {
+                                    view! { <div /> }.into_view()
+                                }}
+                                
+                                {move || if ai_step.get() < 5 {
+                                    view! {
+                                        <button class="wizard-btn-next" on:click=move |_| set_ai_step.update(|s| *s += 1)>
+                                            "Nästa"
+                                        </button>
+                                    }.into_view()
+                                } else {
+                                    view! {
+                                        <button class="wizard-btn-next" on:click=move |_| generate_with_ai()>
+                                            "Generera Rutin 🪄"
+                                        </button>
+                                    }.into_view()
+                                }}
+                            </div>
+                        })}
+                    </div>
+                </div>
+            })}
         </div>
     }
 }
