@@ -237,16 +237,12 @@ if (!('encodeInto' in cachedTextEncoder)) {
 
 let WASM_VECTOR_LEN = 0;
 
-function __wasm_bindgen_func_elem_4998(arg0, arg1, arg2) {
-    wasm.__wasm_bindgen_func_elem_4998(arg0, arg1, addHeapObject(arg2));
+function __wasm_bindgen_func_elem_987(arg0, arg1, arg2) {
+    wasm.__wasm_bindgen_func_elem_987(arg0, arg1, addHeapObject(arg2));
 }
 
 function __wasm_bindgen_func_elem_3007(arg0, arg1, arg2) {
     wasm.__wasm_bindgen_func_elem_3007(arg0, arg1, addHeapObject(arg2));
-}
-
-function __wasm_bindgen_func_elem_987(arg0, arg1, arg2) {
-    wasm.__wasm_bindgen_func_elem_987(arg0, arg1, addHeapObject(arg2));
 }
 
 function __wasm_bindgen_func_elem_2471(arg0, arg1) {
@@ -255,6 +251,10 @@ function __wasm_bindgen_func_elem_2471(arg0, arg1) {
 
 function __wasm_bindgen_func_elem_3006(arg0, arg1) {
     wasm.__wasm_bindgen_func_elem_3006(arg0, arg1);
+}
+
+function __wasm_bindgen_func_elem_4998(arg0, arg1, arg2) {
+    wasm.__wasm_bindgen_func_elem_4998(arg0, arg1, addHeapObject(arg2));
 }
 
 function __wasm_bindgen_func_elem_5309(arg0, arg1, arg2, arg3) {
