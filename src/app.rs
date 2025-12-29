@@ -1750,11 +1750,21 @@ fn Settings(
     // Fetch name from cloud if it's missing or to ensure it's fresh
     create_effect(move |_| {
         spawn_local(async move {
-            if let Ok(Some(cloud_name)) = supabase::fetch_display_name().await {
-                if !cloud_name.is_empty() {
-                    set_display_name.set(cloud_name.clone());
-                    set_name_input.set(cloud_name.clone());
-                    storage::save_display_name(&cloud_name);
+            web_sys::console::log_1(&"Attempting to fetch display name from cloud...".into());
+            match supabase::fetch_display_name().await {
+                Ok(Some(cloud_name)) => {
+                    web_sys::console::log_1(&format!("Fetched name: {}", cloud_name).into());
+                    if !cloud_name.is_empty() {
+                        set_display_name.set(cloud_name.clone());
+                        set_name_input.set(cloud_name.clone());
+                        storage::save_display_name(&cloud_name);
+                    }
+                }
+                Ok(None) => {
+                    web_sys::console::log_1(&"No display name found in cloud (returned None)".into());
+                }
+                Err(e) => {
+                    web_sys::console::log_1(&format!("Failed to fetch display name: {:?}", e).into());
                 }
             }
         });
