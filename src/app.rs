@@ -1332,15 +1332,21 @@ fn WeightChart(history: Vec<crate::storage::BodyweightEntry>) -> impl IntoView {
         return view! { <div class="empty-chart">"Ingen data för senaste året"</div> }.into_view();
     }
     
-    let min_w = data.iter().map(|h| h.weight).fold(f64::INFINITY, f64::min);
-    let max_w = data.iter().map(|h| h.weight).fold(f64::NEG_INFINITY, f64::max);
-    let range = (max_w - min_w).max(1.0);
+    let min_val = data.iter().map(|h| h.weight).fold(f64::INFINITY, f64::min);
+    let max_val = data.iter().map(|h| h.weight).fold(f64::NEG_INFINITY, f64::max);
     
-    let padding = 20.0;
+    // Add padding to Y-axis so curve isn't so dramatic (at least 10kg range)
+    let weight_diff = max_val - min_val;
+    let padding_y = (10.0 - weight_diff).max(2.0) / 2.0;
+    let min_w = min_val - padding_y;
+    let max_w = max_val + padding_y;
+    let range = max_w - min_w;
+    
+    let padding = 15.0;
     let width = 100.0;
-    let height = 100.0;
+    let height = 60.0; // Shorter height for a more subtle curve
     
-    // X-axis is time-based now
+    // X-axis is time-based
     let first_ts = data.first().unwrap().timestamp;
     let last_ts = data.last().unwrap().timestamp;
     let time_range = (last_ts - first_ts).max(1) as f64;
@@ -1361,36 +1367,31 @@ fn WeightChart(history: Vec<crate::storage::BodyweightEntry>) -> impl IntoView {
     view! {
         <div class="weight-chart-container">
             <svg viewBox=format!("0 0 {} {}", width, height) class="weight-chart-svg">
-                // Grid lines (min/max)
-                <line x1=padding y1={get_y(min_w)} x2={width-padding} y2={get_y(min_w)} stroke="#222" stroke-width="1" stroke-dasharray="2,2" />
-                <line x1=padding y1={get_y(max_w)} x2={width-padding} y2={get_y(max_w)} stroke="#222" stroke-width="1" stroke-dasharray="2,2" />
+                // Subtle horizontal grid lines
+                <line x1=padding y1={get_y(min_val)} x2={width-padding} y2={get_y(min_val)} stroke="#222" stroke-width="0.5" stroke-dasharray="2,2" />
+                <line x1=padding y1={get_y(max_val)} x2={width-padding} y2={get_y(max_val)} stroke="#222" stroke-width="0.5" stroke-dasharray="2,2" />
                 
-                // The line
+                // The line (thinner now)
                 <polyline points=points class="weight-line" />
                 
-                // Points
-                {data.iter().enumerate().map(|(idx, h)| {
-                    let x = get_x(h.timestamp);
-                    let y = get_y(h.weight);
-                    view! {
-                        <circle cx=x cy=y r="4" class="weight-point" />
-                        {if idx == 0 || idx == data.len() - 1 || h.weight == max_w || h.weight == min_w {
-                            // Alternate label position to prevent overlap
-                            let y_off = if idx % 2 == 0 { -12.0 } else { 16.0 };
-                            view! {
-                                <text x=x y={y + y_off} font-size="12" fill="var(--fg-primary)" text-anchor="middle" font-family="var(--font)" font-weight="700">
-                                    {format!("{:.1}", h.weight)}
-                                </text>
-                            }.into_view()
-                        } else {
-                            view! { <text /> }.into_view()
-                        }}
-                    }
-                }).collect_view()}
+                // Only first and last points
+                {let first = data.first().unwrap();
+                 let last = data.last().unwrap();
+                 view! {
+                    <circle cx={get_x(first.timestamp)} cy={get_y(first.weight)} r="1.5" class="weight-point" />
+                    <circle cx={get_x(last.timestamp)} cy={get_y(last.weight)} r="1.5" class="weight-point" />
+                 }}
             </svg>
-            <div class="weight-chart-labels">
-                <span class="weight-chart-label">{format_date(data.first().unwrap().timestamp)}</span>
-                <span class="weight-chart-label">{format_date(data.last().unwrap().timestamp)}</span>
+            
+            <div class="weight-stats-row">
+                <div class="weight-stat">
+                    <span class="weight-stat-label">{format_date(data.first().unwrap().timestamp)}</span>
+                    <span class="weight-stat-val">{format!("{:.1}", data.first().unwrap().weight)}</span>
+                </div>
+                <div class="weight-stat">
+                    <span class="weight-stat-label">"Nu"</span>
+                    <span class="weight-stat-val highlight">{format!("{:.1}", data.last().unwrap().weight)}</span>
+                </div>
             </div>
         </div>
     }.into_view()
@@ -1673,24 +1674,13 @@ fn Stats(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>, 
                 // ═══════════════════════════════════════════════════════════════
                 // 6. WEIGHT CURVE (Moved below heatmap)
                 // ═══════════════════════════════════════════════════════════════
-                <div class="stat-card weight-card-new">
+                <div class="stat-card">
                     <div class="stat-card-title">"Viktutveckling"</div>
                     {move || {
                         let _ = data_version.get();
                         let db = storage::load_data();
                         view! { <WeightChart history=db.bodyweight_history /> }
                     }}
-                    <div class="bodyweight-ref">
-                        {move || {
-                            let bw = bodyweight.get();
-                            let bw_display = bw.map(|w| format!("{:.1}", w)).unwrap_or("--.-".to_string());
-                            view! {
-                                <span class="bw-label">"Nuvarande vikt: "</span>
-                                <span class="bw-value">{bw_display}</span>
-                                <span class="bw-kg">" kg"</span>
-                            }
-                        }}
-                    </div>
                 </div>
                 
                 // ═══════════════════════════════════════════════════════════════

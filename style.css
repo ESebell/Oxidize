@@ -1608,21 +1608,21 @@ button {
 /* Weight Chart */
 .weight-chart-container {
     width: 100%;
-    height: 150px;
     margin-top: 1rem;
     position: relative;
 }
 
 .weight-chart-svg {
     width: 100%;
-    height: 100%;
+    height: auto;
+    display: block;
     overflow: visible;
 }
 
 .weight-line {
     fill: none;
     stroke: var(--accent-a);
-    stroke-width: 5;
+    stroke-width: 2; /* Thinner, cleaner line */
     stroke-linecap: round;
     stroke-linejoin: round;
 }
@@ -1630,45 +1630,46 @@ button {
 .weight-point {
     fill: var(--accent-a);
     stroke: var(--bg-card);
-    stroke-width: 3;
+    stroke-width: 1.5;
 }
 
-.weight-chart-labels {
+.weight-stats-row {
     display: flex;
     justify-content: space-between;
     margin-top: 1.5rem;
-    padding: 0 15px;
-}
-
-.weight-chart-label {
-    font-size: 1rem;
-    color: var(--fg-secondary);
-}
-
-.bodyweight-ref {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    margin-top: 1.5rem;
+    padding: 0 5px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
     padding-top: 1rem;
-    border-top: 1px solid var(--border);
 }
 
-.bodyweight-ref .bw-label {
-    font-size: 0.9rem;
-    color: var(--fg-muted);
+.weight-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
 }
 
-.bodyweight-ref .bw-value {
-    font-size: 1.75rem;
+.weight-stat-label {
+    font-size: 0.75rem;
+    color: var(--fg-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.weight-stat-val {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--fg-primary);
+}
+
+.weight-stat-val.highlight {
     color: var(--accent-a);
-    font-weight: 800;
 }
 
-.bodyweight-ref .bw-kg {
-    font-size: 0.9rem;
+.empty-chart {
+    padding: 2rem;
+    text-align: center;
     color: var(--fg-muted);
+    font-size: 0.9rem;
 }
 
 .efficiency-main {
