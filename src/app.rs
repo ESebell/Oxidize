@@ -1746,6 +1746,19 @@ fn Settings(
     let (display_name, set_display_name) = create_signal(initial_name.clone());
     let (editing_name, set_editing_name) = create_signal(false);
     let (name_input, set_name_input) = create_signal(initial_name);
+
+    // Fetch name from cloud if it's missing or to ensure it's fresh
+    create_effect(move |_| {
+        spawn_local(async move {
+            if let Ok(Some(cloud_name)) = supabase::fetch_display_name().await {
+                if !cloud_name.is_empty() {
+                    set_display_name.set(cloud_name.clone());
+                    set_name_input.set(cloud_name.clone());
+                    storage::save_display_name(&cloud_name);
+                }
+            }
+        });
+    });
     
     let save_display_name = move |_| {
         let name = name_input.get();
