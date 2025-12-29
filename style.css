@@ -2028,6 +2028,90 @@ button {
     border: 1px solid var(--border);
 }
 
+.delete-routine-btn {
+    width: 100%;
+    padding: 0.9rem;
+    margin-top: 1rem;
+    background: transparent;
+    border: 1px solid #ef4444;
+    border-radius: 8px;
+    color: #ef4444;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.delete-routine-btn:active {
+    background: rgba(239, 68, 68, 0.15);
+}
+
+/* Delete Confirmation Modal */
+.delete-confirm-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 1rem;
+}
+
+.delete-confirm-dialog {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 1.5rem;
+    max-width: 320px;
+    width: 100%;
+    text-align: center;
+}
+
+.delete-confirm-dialog h3 {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    color: #ef4444;
+}
+
+.delete-warning {
+    color: var(--fg-secondary);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 1.5rem;
+}
+
+.delete-warning strong {
+    color: var(--fg-primary);
+}
+
+.delete-confirm-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.cancel-delete-btn {
+    flex: 1;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--fg-secondary);
+    font-size: 0.95rem;
+}
+
+.confirm-delete-btn {
+    flex: 1;
+    padding: 0.75rem;
+    background: #ef4444;
+    border-radius: 8px;
+    color: white;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.confirm-delete-btn:disabled,
+.cancel-delete-btn:disabled {
+    opacity: 0.5;
+}
+
 .create-routine-btn {
     width: 100%;
     padding: 1rem;

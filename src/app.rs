@@ -270,17 +270,33 @@ fn Register(set_view: WriteSignal<AppView>, set_auth: WriteSignal<Option<AuthSes
 
 #[component]
 fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession>>) -> impl IntoView {
+    // Refresh token and sync data when Dashboard is viewed
+    // This ensures fresh data after app was in background
+    supabase::check_and_refresh_session();
+    
+    // If session was expired and user got signed out, redirect to login
+    if supabase::load_auth_session().is_none() {
+        set_view.set(AppView::Login);
+        return view! { <div class="loading">"Sessionen har gått ut..."</div> }.into_view();
+    }
+    
+    storage::reset_sync_status();
+    supabase::sync_from_cloud();
+    
     // Signal to trigger data reload
     let (data_version, set_data_version) = create_signal(storage::get_data_version());
-    let (is_loading, set_is_loading) = create_signal(!storage::is_sync_complete());
+    let (is_loading, set_is_loading) = create_signal(true); // Start as loading
     
     // Active routine from Supabase
     let (active_routine, set_active_routine) = create_signal(Option::<crate::types::SavedRoutine>::None);
     let (routine_loading, set_routine_loading) = create_signal(true);
     
-    // Load active routine on mount
+    // Load active routine on mount (after token refresh)
     create_effect(move |_| {
         spawn_local(async move {
+            // Small delay to let token refresh complete
+            gloo_timers::future::TimeoutFuture::new(100).await;
+            
             match supabase::fetch_routines().await {
                 Ok(routines) => {
                     let active = routines.into_iter().find(|r| r.is_active);
@@ -497,7 +513,7 @@ fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSession
                 </div>
             })}
         </div>
-    }
+    }.into_view()
 }
 
 #[component]
@@ -1802,7 +1818,6 @@ fn Settings(
                         view! {
                             <div class="routines-list">
                                 {routines_list.into_iter().map(|r| {
-                                    let id = r.id.clone();
                                     let id_for_edit = r.id.clone();
                                     let id_for_activate = r.id.clone();
                                     let is_active = r.is_active;
@@ -1874,8 +1889,12 @@ fn RoutineBuilder(
     let (adding_exercise_to, set_adding_exercise_to) = create_signal(Option::<(usize, bool)>::None);
     // (pass_index, exercise_index) - which exercise we want to link as superset
     let (linking_superset, set_linking_superset) = create_signal(Option::<(usize, usize)>::None);
+    // Delete state
+    let (show_delete_confirm, set_show_delete_confirm) = create_signal(false);
+    let (deleting, set_deleting) = create_signal(false);
     let is_editing = routine_id.is_some();
     let routine_id_for_save = routine_id.clone();
+    let routine_id_for_delete = routine_id.clone();
     
     // Load existing routine if editing
     if let Some(ref id) = routine_id {
@@ -2339,8 +2358,69 @@ fn RoutineBuilder(
                         >
                             {if saving.get() { "Sparar..." } else { "Spara rutin" }}
                         </button>
+                        
+                        // Delete button (only when editing existing routine)
+                        {is_editing.then(|| {
+                            view! {
+                                <button
+                                    class="delete-routine-btn"
+                                    on:click=move |_| set_show_delete_confirm.set(true)
+                                >
+                                    "Radera rutin"
+                                </button>
+                            }
+                        })}
                     </div>
                 }.into_view()
+            }}
+            
+            // Delete confirmation modal
+            {move || {
+                let id_for_delete = routine_id_for_delete.clone();
+                show_delete_confirm.get().then(|| {
+                    let routine_name_display = routine_name.get();
+                    view! {
+                        <div class="delete-confirm-modal">
+                            <div class="delete-confirm-dialog">
+                                <h3>"Radera rutin?"</h3>
+                                <p class="delete-warning">
+                                    "Är du säker på att du vill radera "
+                                    <strong>{routine_name_display}</strong>
+                                    "? Detta kan inte ångras."
+                                </p>
+                                <div class="delete-confirm-actions">
+                                    <button 
+                                        class="cancel-delete-btn" 
+                                        on:click=move |_| set_show_delete_confirm.set(false)
+                                        disabled=deleting
+                                    >
+                                        "Avbryt"
+                                    </button>
+                                    <button 
+                                        class="confirm-delete-btn" 
+                                        on:click=move |_| {
+                                            if let Some(ref id) = id_for_delete {
+                                                let id_clone = id.clone();
+                                                set_deleting.set(true);
+                                                spawn_local(async move {
+                                                    if crate::supabase::delete_routine(&id_clone).await.is_ok() {
+                                                        storage::clear_active_routine();
+                                                    }
+                                                    set_deleting.set(false);
+                                                    set_show_delete_confirm.set(false);
+                                                    set_view.set(AppView::Settings);
+                                                });
+                                            }
+                                        }
+                                        disabled=deleting
+                                    >
+                                        {if deleting.get() { "Raderar..." } else { "Radera" }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                })
             }}
         </div>
     }
