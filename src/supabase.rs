@@ -1188,6 +1188,29 @@ struct GeminiPartResp {
 pub async fn call_gemini(api_key: &str, system_prompt: &str, user_prompt: &str) -> Result<String, JsValue> {
     let window = web_sys::window().ok_or("no window")?;
     
+    // First, let's list available models to see what we have access to
+    let list_url = format!(
+        "https://generativelanguage.googleapis.com/v1beta/models?key={}",
+        api_key
+    );
+    web_sys::console::log_1(&format!("DEBUG: Listing available models...").into());
+    
+    let list_headers = Headers::new()?;
+    let list_opts = RequestInit::new();
+    list_opts.set_method("GET");
+    list_opts.set_headers(&list_headers);
+    
+    let list_request = Request::new_with_str_and_init(&list_url, &list_opts)?;
+    let list_resp_value = JsFuture::from(window.fetch_with_request(&list_request)).await?;
+    let list_resp: Response = list_resp_value.dyn_into()?;
+    
+    if list_resp.ok() {
+        let list_text = JsFuture::from(list_resp.text()?).await?.as_string().unwrap_or_default();
+        web_sys::console::log_1(&format!("DEBUG: Available models: {}", &list_text[..500.min(list_text.len())]).into());
+    } else {
+        web_sys::console::log_1(&format!("DEBUG: Failed to list models: {}", list_resp.status()).into());
+    }
+    
     let full_prompt = format!("{}\n\nUser request: {}", system_prompt, user_prompt);
     
     let req_body = GeminiRequest {
@@ -1206,16 +1229,13 @@ pub async fn call_gemini(api_key: &str, system_prompt: &str, user_prompt: &str) 
     opts.set_headers(&headers);
     opts.set_body(&JsValue::from_str(&body_str));
     
-    // Use gemini-1.5-flash-latest which should always resolve to the latest flash model
+    // Use gemini-1.5-flash (without -latest suffix)
     let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={}",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={}",
         api_key
     );
     
-    // Debug logging
-    web_sys::console::log_1(&format!("DEBUG: API key length: {}", api_key.len()).into());
-    web_sys::console::log_1(&format!("DEBUG: API key first 10 chars: {}", &api_key[..10.min(api_key.len())]).into());
-    web_sys::console::log_1(&format!("DEBUG: Full URL: {}", url).into());
+    web_sys::console::log_1(&format!("DEBUG: Calling: {}", url).into());
     
     let request = Request::new_with_str_and_init(&url, &opts)?;
     let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
