@@ -28,12 +28,8 @@ pub fn Dashboard(set_view: WriteSignal<AppView>, auth: ReadSignal<Option<AuthSes
 
             match supabase::fetch_routines().await {
                 Ok(routines) => {
-                    let mut active = routines.into_iter().find(|r| r.is_active);
-                    if let Some(ref mut r) = active {
-                        if storage::migrate_routine_names(r) {
-                            // Push renamed routine back to Supabase
-                            let _ = supabase::save_routine(r).await;
-                        }
+                    let active = routines.into_iter().find(|r| r.is_active);
+                    if let Some(ref r) = active {
                         storage::save_active_routine(r);
                     }
                     set_active_routine.set(active);

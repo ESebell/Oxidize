@@ -792,37 +792,6 @@ async fn do_sync() -> Result<(), JsValue> {
     db.bodyweight_history = cloud_bw_history;
     db.sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
-    // Migrate exercise names (Swedish → English) and push back to cloud
-    let sessions_changed = {
-        let mut changed = false;
-        for session in &mut db.sessions {
-            for ex in &mut session.exercises {
-                for &(old, new) in crate::storage::EXERCISE_RENAMES {
-                    if ex.name == old {
-                        ex.name = new.to_string();
-                        changed = true;
-                    }
-                }
-            }
-        }
-        changed
-    };
-
-    for &(old, new) in crate::storage::EXERCISE_RENAMES {
-        if let Some(data) = db.last_weights.remove(old) {
-            db.last_weights.insert(new.to_string(), data);
-        }
-    }
-
-    // Push migrated sessions back to Supabase so cloud data is fixed permanently
-    if sessions_changed {
-        web_sys::console::log_1(&"Migrating exercise names in cloud...".into());
-        for session in &db.sessions {
-            let _ = upsert_session(session).await;
-        }
-        web_sys::console::log_1(&"Cloud migration done".into());
-    }
-
     // Save to localStorage
     web_sys::console::log_1(&"Saving to localStorage...".into());
     match crate::storage::save_data(&db) {

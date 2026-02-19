@@ -86,11 +86,7 @@ pub fn save_active_routine(routine: &SavedRoutine) {
 pub fn load_active_routine() -> Option<SavedRoutine> {
     let storage = get_local_storage()?;
     let json = storage.get_item(ACTIVE_ROUTINE_KEY).ok()??;
-    let mut routine: SavedRoutine = serde_json::from_str(&json).ok()?;
-    if migrate_routine_names(&mut routine) {
-        save_active_routine(&routine);
-    }
-    Some(routine)
+    serde_json::from_str(&json).ok()
 }
 
 pub fn clear_active_routine() {
@@ -123,60 +119,7 @@ pub fn load_data() -> Database {
         _ => return Database::default(),
     };
 
-    let mut db: Database = serde_json::from_str(&json).unwrap_or_default();
-    migrate_exercise_names(&mut db);
-    db
-}
-
-/// One-time migration: rename Swedish exercise names to match Wger
-pub fn migrate_exercise_names(db: &mut Database) {
-    let renames = EXERCISE_RENAMES;
-    let mut changed = false;
-
-    for session in &mut db.sessions {
-        for ex in &mut session.exercises {
-            for &(old, new) in renames {
-                if ex.name == old {
-                    ex.name = new.to_string();
-                    changed = true;
-                }
-            }
-        }
-    }
-
-    for &(old, new) in renames {
-        if let Some(data) = db.last_weights.remove(old) {
-            db.last_weights.insert(new.to_string(), data);
-            changed = true;
-        }
-    }
-
-    if changed {
-        let _ = save_data(db);
-    }
-}
-
-pub const EXERCISE_RENAMES: &[(&str, &str)] = &[
-    ("Knäböj", "Squats"),
-    ("Bänkpress", "Bench Press"),
-    ("Marklyft", "Deadlift"),
-    ("Militärpress", "Shoulder Press"),
-];
-
-/// Migrate exercise names in a routine's passes. Returns true if changed.
-pub fn migrate_routine_names(routine: &mut SavedRoutine) -> bool {
-    let mut changed = false;
-    for pass in &mut routine.passes {
-        for ex in pass.exercises.iter_mut().chain(pass.finishers.iter_mut()) {
-            for &(old, new) in EXERCISE_RENAMES {
-                if ex.name == old {
-                    ex.name = new.to_string();
-                    changed = true;
-                }
-            }
-        }
-    }
-    changed
+    serde_json::from_str(&json).unwrap_or_default()
 }
 
 // Paused workout functions

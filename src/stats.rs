@@ -304,16 +304,13 @@ pub fn calculate_weekly_sets(db: &Database, days: i64) -> HashMap<MuscleGroup, u
 
 /// Power score history (for graphing)
 pub fn get_power_score_history(db: &Database) -> Vec<(i64, f64)> {
-    // Group sessions by date, calculate power score at each point
     let mut current_best: HashMap<&str, f64> = HashMap::new();
     let mut history: Vec<(i64, f64)> = Vec::new();
-    
-    // Sort sessions by time
+
     let mut sessions: Vec<_> = db.sessions.iter().collect();
     sessions.sort_by_key(|s| s.timestamp);
-    
+
     for session in sessions {
-        // Update best E1RM for each big lift
         for &lift in &BIG_FOUR {
             if let Some(e1rm) = session_best_e1rm(session, lift) {
                 let current = current_best.entry(lift).or_insert(0.0);
@@ -322,14 +319,13 @@ pub fn get_power_score_history(db: &Database) -> Vec<(i64, f64)> {
                 }
             }
         }
-        
-        // Calculate total power score at this point
+
         let score: f64 = current_best.values().sum();
         if score > 0.0 {
             history.push((session.timestamp, score));
         }
     }
-    
+
     history
 }
 
