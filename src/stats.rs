@@ -27,7 +27,7 @@ pub fn session_best_e1rm(session: &Session, exercise_name: &str) -> Option<f64> 
 }
 
 /// The "Big 4" lifts for power score
-pub const BIG_FOUR: [&str; 4] = ["Knäböj", "Marklyft", "Bänkpress", "Militärpress"];
+pub const BIG_FOUR: [&str; 4] = ["Squats", "Deadlift", "Bench Press", "Shoulder Press"];
 
 /// Calculate total power score (sum of E1RM for big 4)
 pub fn calculate_power_score(db: &Database) -> f64 {
@@ -158,12 +158,12 @@ pub fn parse_muscle_name(name: &str) -> Option<MuscleGroup> {
 pub fn get_muscle_groups_weighted(exercise: &str) -> Vec<(MuscleGroup, u32)> {
     match exercise {
         // Pass A
-        "Knäböj" => vec![
+        "Squats" | "Knäböj" => vec![
             (MuscleGroup::Quads, 3),
             (MuscleGroup::Glutes, 3),
             (MuscleGroup::Core, 1),
         ],
-        "Bänkpress" => vec![
+        "Bench Press" | "Bänkpress" => vec![
             (MuscleGroup::Chest, 3),
             (MuscleGroup::Triceps, 1),
             (MuscleGroup::Shoulders, 1),
@@ -187,13 +187,13 @@ pub fn get_muscle_groups_weighted(exercise: &str) -> Vec<(MuscleGroup, u32)> {
             (MuscleGroup::Calves, 3),
         ],
         // Pass B
-        "Marklyft" => vec![
+        "Deadlift" | "Marklyft" => vec![
             (MuscleGroup::Back, 3),
             (MuscleGroup::Hamstrings, 3),
             (MuscleGroup::Glutes, 3),
             (MuscleGroup::Core, 1),
         ],
-        "Militärpress" => vec![
+        "Shoulder Press" | "Militärpress" => vec![
             (MuscleGroup::Shoulders, 3),
             (MuscleGroup::Triceps, 1),
         ],
