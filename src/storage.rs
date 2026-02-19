@@ -113,13 +113,49 @@ pub fn load_data() -> Database {
         Some(s) => s,
         None => return Database::default(),
     };
-    
+
     let json = match storage.get_item("oxidize_db_v2") {
         Ok(Some(j)) => j,
         _ => return Database::default(),
     };
-    
-    serde_json::from_str(&json).unwrap_or_default()
+
+    let mut db: Database = serde_json::from_str(&json).unwrap_or_default();
+    migrate_exercise_names(&mut db);
+    db
+}
+
+/// One-time migration: rename Swedish exercise names to match Wger
+fn migrate_exercise_names(db: &mut Database) {
+    let renames: &[(&str, &str)] = &[
+        ("Knäböj", "Squats"),
+        ("Bänkpress", "Bench Press"),
+        ("Marklyft", "Deadlift"),
+        ("Militärpress", "Shoulder Press"),
+    ];
+
+    let mut changed = false;
+
+    for session in &mut db.sessions {
+        for ex in &mut session.exercises {
+            for &(old, new) in renames {
+                if ex.name == old {
+                    ex.name = new.to_string();
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    for &(old, new) in renames {
+        if let Some(data) = db.last_weights.remove(old) {
+            db.last_weights.insert(new.to_string(), data);
+            changed = true;
+        }
+    }
+
+    if changed {
+        let _ = save_data(db);
+    }
 }
 
 // Paused workout functions
@@ -229,8 +265,8 @@ pub fn create_default_routine() -> SavedRoutine {
         name: "Pass A".to_string(),
         description: "Ben · Press · Triceps".to_string(),
         exercises: vec![
-            Exercise::standard("Knäböj", 3, "5-8"),
-            Exercise::standard("Bänkpress", 3, "5-8"),
+            Exercise::standard("Squats", 3, "5-8"),
+            Exercise::standard("Bench Press", 3, "5-8"),
             Exercise::standard("Hip Thrusts", 3, "8-12"),
             Exercise::standard("Latsdrag", 3, "8-10"),
             Exercise::superset("Leg Curls", 2, "12-15", "Dips", Some("Ben/Triceps")),
@@ -247,8 +283,8 @@ pub fn create_default_routine() -> SavedRoutine {
         name: "Pass B".to_string(),
         description: "Rygg · Axlar · Biceps".to_string(),
         exercises: vec![
-            Exercise::standard("Marklyft", 3, "5"),
-            Exercise::standard("Militärpress", 3, "8-10"),
+            Exercise::standard("Deadlift", 3, "5"),
+            Exercise::standard("Shoulder Press", 3, "8-10"),
             Exercise::standard("Sittande rodd", 3, "10-12"),
             Exercise::superset("Sidolyft", 3, "12-15", "Hammercurls", Some("Axlar/Armar")),
             Exercise::superset("Hammercurls", 3, "10-12", "Sidolyft", Some("Axlar/Armar")),
