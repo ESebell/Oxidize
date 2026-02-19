@@ -2417,6 +2417,7 @@ button {
     width: 100%;
     max-width: 500px;
     max-height: 80vh;
+    overflow-y: auto;
     background: var(--bg-card);
     border-radius: 16px 16px 0 0;
     padding: 1.5rem;
