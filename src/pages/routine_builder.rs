@@ -66,7 +66,8 @@ struct WgerExercise {
 async fn search_wger_exercises(query: &str) -> Result<Vec<WgerExercise>, JsValue> {
     let window = web_sys::window().ok_or("no window")?;
 
-    let url = format!("https://wger.de/api/v2/exercise/search/?language=2&term={}", query);
+    let encoded_query = js_sys::encode_uri_component(query);
+    let url = format!("https://wger.de/api/v2/exercise/search/?language=2&term={}", encoded_query);
     let resp_value = JsFuture::from(window.fetch_with_str(&url)).await?;
     let resp: Response = resp_value.dyn_into()?;
 
@@ -613,19 +614,21 @@ pub fn RoutineBuilder(
                                                 let ex_clone = ex.clone();
                                                 view! {
                                                     <div class="search-result-item" on:click=move |_| {
+                                                        // Read fresh values from signal to avoid stale captures
+                                                        let Some((pi, fin)) = adding_exercise_to.get() else { return };
                                                         let mut p = passes.get();
-                                                        if let Some(pass) = p.get_mut(pass_idx) {
+                                                        if let Some(pass) = p.get_mut(pi) {
                                                             let mut new_ex = crate::types::Exercise::from_wger(
                                                                 &ex_clone.name,
                                                                 3,
-                                                                if is_finisher { "30s" } else { "8-12" },
+                                                                if fin { "30s" } else { "8-12" },
                                                                 ex_clone.primary_muscles.clone(),
                                                                 ex_clone.secondary_muscles.clone(),
                                                                 ex_clone.image_url.clone(),
                                                                 ex_clone.equipment.clone(),
                                                                 ex_clone.id,
                                                             );
-                                                            if is_finisher {
+                                                            if fin {
                                                                 new_ex.is_bodyweight = true;
                                                                 pass.finishers.push(new_ex);
                                                             } else {

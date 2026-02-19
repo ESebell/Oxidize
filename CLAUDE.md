@@ -12,6 +12,26 @@ trunk build --release  # Output i dist/
 
 Kräver: `cargo install trunk` och `rustup target add wasm32-unknown-unknown`
 
+## Deploy
+
+Manuell deploy till GitHub Pages via `gh-pages`-branchen:
+
+```bash
+trunk build --release
+cp -f manifest.json sw.js icon-*.png dist/
+git checkout gh-pages
+cp dist/* .
+# git rm gamla .js/.wasm/.css-filer, git add nya
+git commit -m "Deploy: ..."
+git push origin gh-pages
+git checkout main
+```
+
+VIKTIGT: Bumpa `CACHE_NAME` i `sw.js` (t.ex. `oxidize-v37` → `v38`) vid varje deploy,
+annars serverar service workern cachad gammal version till användare.
+
+Det finns INGEN automatisk CI/CD — push till `main` deployer inte.
+
 ## Arkitektur
 
 Rust + Leptos 0.6 (CSR) kompilerat till WebAssembly. PWA med offline-stöd.
@@ -25,7 +45,7 @@ Rust + Leptos 0.6 (CSR) kompilerat till WebAssembly. PWA med offline-stöd.
 | `src/pages/auth.rs` | Login + Register |
 | `src/pages/dashboard.rs` | Dashboard |
 | `src/pages/workout.rs` | Workout + WorkoutActive |
-| `src/pages/stats_page.rs` | Stats + ExerciseStatsCard + WeightChart |
+| `src/pages/stats_page.rs` | Stats + WeightChart |
 | `src/pages/settings.rs` | Settings |
 | `src/pages/routine_builder.rs` | RoutineBuilder + AI-generering + Wger-sök |
 | `src/supabase.rs` | Auth, molnsynk, Supabase REST API |
@@ -55,7 +75,7 @@ Supabase (källa)  →  localStorage (cache)  →  Leptos-signaler (UI)
 - **Databas:** Supabase PostgreSQL (RLS per user_id)
 - **Auth:** Supabase Auth (email/password, JWT)
 - **AI:** Google Gemini 2.5 Flash (rutin-generator)
-- **Hosting:** GitHub Pages (statisk PWA)
+- **Hosting:** GitHub Pages (statisk PWA, gh-pages branch)
 - **Språk i UI:** Svenska
 
 ## Supabase-tabeller
@@ -74,7 +94,8 @@ Alla tabeller har RLS-policies som filtrerar på `user_id`.
 - **Tre-tap-regeln:** Tryck övning → reps → vikt = ett set loggat
 - **Supersets:** Två övningar med `is_superset=true` och korshänvisningar via `superset_with`
 - **E1RM:** Brzycki-formel: `weight × (36 / (37 - reps))`
-- **Power Score:** Summa E1RM för Big 4 (Squat, Deadlift, Bench, Hip Thrusts)
+- **Styrketotal:** Summa E1RM för Big 4 (Knäböj, Marklyft, Bänkpress, Militärpress)
+- **Veckovolym:** Set per muskelgrupp/vecka, optimalt 10-20 set (primära muskler)
 - **Sync-polling:** Dashboard pollar `sync_status` var 200ms tills sync klar
 
 ## localStorage-nycklar
@@ -88,7 +109,7 @@ Alla tabeller har RLS-policies som filtrerar på `user_id`.
 
 ## PWA
 
-- Service worker: `sw.js` (cache-first, version `oxidize-v36`)
+- Service worker: `sw.js` (cache-first, bumpa CACHE_NAME vid deploy!)
 - Manifest: `manifest.json` (standalone, dark theme)
 - Post-build hook i Trunk.toml kopierar PWA-assets till dist/
 
