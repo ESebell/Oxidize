@@ -27,6 +27,14 @@
     <!-- Manifest & Styles -->
     <link rel="manifest" href="manifest.json">
     <link data-trunk rel="css" href="style.css">
+
+    <!-- Trunk: copy PWA assets to dist -->
+    <link data-trunk rel="copy-file" href="manifest.json">
+    <link data-trunk rel="copy-file" href="sw.js">
+    <link data-trunk rel="copy-file" href="icon-192.png">
+    <link data-trunk rel="copy-file" href="icon-512.png">
+    <link data-trunk rel="copy-file" href="icon-maskable-192.png">
+    <link data-trunk rel="copy-file" href="icon-maskable-512.png">
     
     <!-- Splash screens for iOS -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">

@@ -540,6 +540,7 @@ pub fn RoutineBuilder(
                                             {pass.finishers.iter().enumerate().map(|(fi, ex)| {
                                                 let fin_sets = ex.sets.to_string();
                                                 let fin_reps = ex.reps_target.clone();
+                                                let is_timed = ex.duration_secs.is_some();
                                                 view! {
                                                     <div class="exercise-item finisher">
                                                         <span class="exercise-name">{&ex.name}</span>
@@ -563,12 +564,42 @@ pub fn RoutineBuilder(
                                                                     let mut p = passes.get();
                                                                     if let Some(pass) = p.get_mut(idx) {
                                                                         if let Some(exercise) = pass.finishers.get_mut(fi) {
-                                                                            exercise.reps_target = val;
+                                                                            // Sync duration_secs if timed
+                                                                            if exercise.duration_secs.is_some() {
+                                                                                let num = val.trim_end_matches(|c: char| !c.is_ascii_digit())
+                                                                                    .parse::<u32>().unwrap_or(30);
+                                                                                exercise.duration_secs = Some(num);
+                                                                                exercise.reps_target = format!("{}s", num);
+                                                                            } else {
+                                                                                exercise.reps_target = val;
+                                                                            }
                                                                         }
                                                                     }
                                                                     set_passes.set(p);
                                                                 }
                                                             />
+                                                            <button class={if is_timed { "timed-toggle active" } else { "timed-toggle" }}
+                                                                title={if is_timed { "Timer-läge (klicka för reps)" } else { "Reps-läge (klicka för timer)" }}
+                                                                on:click=move |_| {
+                                                                    let mut p = passes.get();
+                                                                    if let Some(pass) = p.get_mut(idx) {
+                                                                        if let Some(exercise) = pass.finishers.get_mut(fi) {
+                                                                            if exercise.duration_secs.is_some() {
+                                                                                // Switch to reps mode
+                                                                                exercise.duration_secs = None;
+                                                                                exercise.reps_target = "10-15".to_string();
+                                                                            } else {
+                                                                                // Switch to timed mode
+                                                                                exercise.duration_secs = Some(30);
+                                                                                exercise.reps_target = "30s".to_string();
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                    set_passes.set(p);
+                                                                }
+                                                            >
+                                                                {if is_timed { "⏱" } else { "#" }}
+                                                            </button>
                                                         </div>
                                                         <button class="remove-exercise-btn" on:click=move |_| {
                                                             let mut p = passes.get();

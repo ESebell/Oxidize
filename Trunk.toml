@@ -10,9 +10,3 @@ watch = ["src", "index.html", "style.css"]
 [serve]
 addresses = ["127.0.0.1", "::1"]
 port = 8080
-
-# Copy PWA assets to dist after build completes
-[[hooks]]
-stage = "post_build"
-command = "sh"
-command_arguments = ["-c", "sleep 0.5 && cp -f manifest.json sw.js icon-*.png dist/"]
