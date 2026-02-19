@@ -125,7 +125,7 @@ pub fn load_data() -> Database {
 }
 
 /// One-time migration: rename Swedish exercise names to match Wger
-fn migrate_exercise_names(db: &mut Database) {
+pub fn migrate_exercise_names(db: &mut Database) {
     let renames: &[(&str, &str)] = &[
         ("Knäböj", "Squats"),
         ("Bänkpress", "Bench Press"),

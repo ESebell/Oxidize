@@ -791,7 +791,10 @@ async fn do_sync() -> Result<(), JsValue> {
     db.bodyweight = cloud_bodyweight;
     db.bodyweight_history = cloud_bw_history;
     db.sessions.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-    
+
+    // Migrate exercise names (Swedish → English) before saving
+    crate::storage::migrate_exercise_names(&mut db);
+
     // Save to localStorage
     web_sys::console::log_1(&"Saving to localStorage...".into());
     match crate::storage::save_data(&db) {
