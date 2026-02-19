@@ -451,11 +451,39 @@ pub fn RoutineBuilder(
                                                     String::new()
                                                 };
                                                 let ex_name_for_unlink = ex.name.clone();
+                                                let ex_sets = ex.sets.to_string();
+                                                let ex_reps = ex.reps_target.clone();
                                                 view! {
                                                     <div class={if has_superset { "exercise-item superset" } else { "exercise-item" }}>
                                                         <div class="exercise-main">
                                                             <span class="exercise-name">{&ex.name}</span>
-                                                            <span class="exercise-detail">{format!("{}×{}", ex.sets, ex.reps_target)}</span>
+                                                            <div class="exercise-edit">
+                                                                <input type="number" class="sets-input" value=ex_sets
+                                                                    on:blur=move |e| {
+                                                                        let val = event_target_value(&e).parse::<u8>().unwrap_or(3);
+                                                                        let mut p = passes.get();
+                                                                        if let Some(pass) = p.get_mut(idx) {
+                                                                            if let Some(exercise) = pass.exercises.get_mut(ei) {
+                                                                                exercise.sets = val;
+                                                                            }
+                                                                        }
+                                                                        set_passes.set(p);
+                                                                    }
+                                                                />
+                                                                <span class="x-sep">"×"</span>
+                                                                <input type="text" class="reps-input" value=ex_reps
+                                                                    on:blur=move |e| {
+                                                                        let val = event_target_value(&e);
+                                                                        let mut p = passes.get();
+                                                                        if let Some(pass) = p.get_mut(idx) {
+                                                                            if let Some(exercise) = pass.exercises.get_mut(ei) {
+                                                                                exercise.reps_target = val;
+                                                                            }
+                                                                        }
+                                                                        set_passes.set(p);
+                                                                    }
+                                                                />
+                                                            </div>
                                                         </div>
                                                         {if has_superset {
                                                             let ex_name_unlink = ex_name_for_unlink.clone();
@@ -509,11 +537,46 @@ pub fn RoutineBuilder(
                                             </button>
 
                                             <h3>"Finishers"</h3>
-                                            {pass.finishers.iter().map(|ex| {
+                                            {pass.finishers.iter().enumerate().map(|(fi, ex)| {
+                                                let fin_sets = ex.sets.to_string();
+                                                let fin_reps = ex.reps_target.clone();
                                                 view! {
                                                     <div class="exercise-item finisher">
                                                         <span class="exercise-name">{&ex.name}</span>
-                                                        <span class="exercise-detail">{format!("{}×{}", ex.sets, ex.reps_target)}</span>
+                                                        <div class="exercise-edit">
+                                                            <input type="number" class="sets-input" value=fin_sets
+                                                                on:blur=move |e| {
+                                                                    let val = event_target_value(&e).parse::<u8>().unwrap_or(2);
+                                                                    let mut p = passes.get();
+                                                                    if let Some(pass) = p.get_mut(idx) {
+                                                                        if let Some(exercise) = pass.finishers.get_mut(fi) {
+                                                                            exercise.sets = val;
+                                                                        }
+                                                                    }
+                                                                    set_passes.set(p);
+                                                                }
+                                                            />
+                                                            <span class="x-sep">"×"</span>
+                                                            <input type="text" class="reps-input" value=fin_reps
+                                                                on:blur=move |e| {
+                                                                    let val = event_target_value(&e);
+                                                                    let mut p = passes.get();
+                                                                    if let Some(pass) = p.get_mut(idx) {
+                                                                        if let Some(exercise) = pass.finishers.get_mut(fi) {
+                                                                            exercise.reps_target = val;
+                                                                        }
+                                                                    }
+                                                                    set_passes.set(p);
+                                                                }
+                                                            />
+                                                        </div>
+                                                        <button class="remove-exercise-btn" on:click=move |_| {
+                                                            let mut p = passes.get();
+                                                            if let Some(pass) = p.get_mut(idx) {
+                                                                pass.finishers.remove(fi);
+                                                            }
+                                                            set_passes.set(p);
+                                                        }>"×"</button>
                                                     </div>
                                                 }
                                             }).collect_view()}
@@ -650,8 +713,8 @@ pub fn RoutineBuilder(
                                                         if let Some(pass) = p.get_mut(pi) {
                                                             let mut new_ex = crate::types::Exercise::from_wger(
                                                                 &ex_clone.name,
-                                                                3,
-                                                                if fin { "30s" } else { "8-12" },
+                                                                if fin { 2 } else { 3 },
+                                                                if fin { "10-15" } else { "8-12" },
                                                                 ex_clone.primary_muscles.clone(),
                                                                 ex_clone.secondary_muscles.clone(),
                                                                 ex_clone.image_url.clone(),
