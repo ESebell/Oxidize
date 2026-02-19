@@ -2513,12 +2513,12 @@ button {
 }
 
 .search-results {
-    flex: 1;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
     max-height: 40vh;
+    flex-shrink: 0;
 }
 
 button.search-result-item {
