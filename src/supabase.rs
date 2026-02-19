@@ -9,7 +9,7 @@ const AUTH_SESSION_KEY: &str = "oxidize_auth_session";
 const LAST_ACTIVITY_KEY: &str = "oxidize_last_activity";
 const INACTIVITY_TIMEOUT_SECS: i64 = 4 * 60 * 60; // 4 hours
 
-use crate::types::{Session, AuthSession, AuthUser, SavedRoutine, Pass, Exercise};
+use crate::types::{Session, AuthSession, AuthUser, SavedRoutine, Pass};
 
 // ============ AUTH ============
 
@@ -989,58 +989,6 @@ pub async fn delete_routine(routine_id: &str) -> Result<(), JsValue> {
     
     web_sys::console::log_1(&format!("Routine {} deleted", routine_id).into());
     Ok(())
-}
-
-/// Create default routine from current hardcoded passes
-pub fn create_default_routine() -> SavedRoutine {
-    let pass_a = Pass {
-        name: "Pass A".to_string(),
-        description: "Ben · Press · Triceps".to_string(),
-        exercises: vec![
-            Exercise::standard("Knäböj", 3, "5-8"),
-            Exercise::standard("Bänkpress", 3, "5-8"),
-            Exercise::standard("Hip Thrusts", 3, "8-12"),
-            Exercise::standard("Latsdrag", 3, "8-10"),
-            Exercise::superset("Leg Curls", 2, "12-15", "Dips", Some("Ben/Triceps")),
-            Exercise::superset("Dips", 2, "AMRAP", "Leg Curls", Some("Ben/Triceps")),
-            Exercise::standard("Stående vadpress", 3, "12-15"),
-        ],
-        finishers: vec![
-            Exercise::finisher("Shoulder Taps", 3, "20"),
-            Exercise::timed_finisher("Mountain Climbers", 3, 30),
-        ],
-    };
-    
-    let pass_b = Pass {
-        name: "Pass B".to_string(),
-        description: "Rygg · Axlar · Biceps".to_string(),
-        exercises: vec![
-            Exercise::standard("Marklyft", 3, "5"),
-            Exercise::standard("Militärpress", 3, "8-10"),
-            Exercise::standard("Sittande rodd", 3, "10-12"),
-            Exercise::superset("Sidolyft", 3, "12-15", "Hammercurls", Some("Axlar/Armar")),
-            Exercise::superset("Hammercurls", 3, "10-12", "Sidolyft", Some("Axlar/Armar")),
-            Exercise::superset("Facepulls", 3, "15", "Sittande vadpress", Some("Rygg/Vader")),
-            Exercise::superset("Sittande vadpress", 3, "15-20", "Facepulls", Some("Rygg/Vader")),
-        ],
-        finishers: vec![
-            Exercise::finisher("Dead Bug", 3, "12"),
-            Exercise::finisher("Utfallssteg", 3, "20"),
-        ],
-    };
-    
-    let now = js_sys::Date::now() as i64 / 1000;
-    let id = format!("default_{}", now);
-    
-    SavedRoutine {
-        id,
-        user_id: None,
-        name: "Överkropp/Underkropp".to_string(),
-        focus: "Styrka & Hypertrofi".to_string(),
-        passes: vec![pass_a, pass_b],
-        is_active: true,
-        created_at: now,
-    }
 }
 
 // ============ USER SETTINGS (Display Name) ============

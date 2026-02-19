@@ -185,19 +185,6 @@ pub struct Session {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
-pub struct ExerciseStats {
-    pub name: String,
-    pub current_weight: f64,
-    pub estimated_1rm: f64,
-    pub total_volume: f64,
-    pub best_set: Option<SetRecord>,
-    pub sessions_count: usize,
-    pub avg_rest_time: f64,
-    pub volume_trend: Vec<(i64, f64)>,
-    pub one_rm_trend: Vec<(i64, f64)>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
 pub struct TotalStats {
     pub total_sessions: usize,
     pub total_volume: f64,

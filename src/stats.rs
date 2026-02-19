@@ -27,7 +27,7 @@ pub fn session_best_e1rm(session: &Session, exercise_name: &str) -> Option<f64> 
 }
 
 /// The "Big 4" lifts for power score
-pub const BIG_FOUR: [&str; 4] = ["Knäböj", "Marklyft", "Bänkpress", "Hip Thrusts"];
+pub const BIG_FOUR: [&str; 4] = ["Knäböj", "Marklyft", "Bänkpress", "Militärpress"];
 
 /// Calculate total power score (sum of E1RM for big 4)
 pub fn calculate_power_score(db: &Database) -> f64 {
@@ -38,19 +38,6 @@ pub fn calculate_power_score(db: &Database) -> f64 {
                 .fold(0.0, f64::max)
         })
         .sum()
-}
-
-/// Calculate power-to-weight ratio
-pub fn calculate_power_to_weight(db: &Database, bodyweight: f64) -> f64 {
-    if bodyweight <= 0.0 { return 0.0; }
-    calculate_power_score(db) / bodyweight
-}
-
-/// Calculate efficiency (kg lifted per minute)
-pub fn calculate_efficiency(session: &Session) -> f64 {
-    if session.duration_secs <= 0 { return 0.0; }
-    let minutes = session.duration_secs as f64 / 60.0;
-    session.total_volume / minutes
 }
 
 /// Check if an exercise showed progressive overload vs last time
@@ -146,184 +133,173 @@ impl MuscleGroup {
     }
 }
 
-/// Map exercises to muscle groups with weights
+/// Parse a muscle name string (from Wger API or AI) to MuscleGroup
+pub fn parse_muscle_name(name: &str) -> Option<MuscleGroup> {
+    match name.to_lowercase().as_str() {
+        "chest" | "bröst" | "pectoralis" => Some(MuscleGroup::Chest),
+        "back" | "rygg" | "lats" | "latissimus" => Some(MuscleGroup::Back),
+        "shoulders" | "axlar" | "deltoids" | "delts" => Some(MuscleGroup::Shoulders),
+        "biceps" | "bicep" => Some(MuscleGroup::Biceps),
+        "triceps" | "tricep" => Some(MuscleGroup::Triceps),
+        "quads" | "quadriceps" | "lår (fram)" | "legs" => Some(MuscleGroup::Quads),
+        "hamstrings" | "lår (bak)" | "hamstring" => Some(MuscleGroup::Hamstrings),
+        "glutes" | "rumpa" | "gluteus" | "gluteals" => Some(MuscleGroup::Glutes),
+        "calves" | "vader" | "calf" => Some(MuscleGroup::Calves),
+        "core" | "abs" | "mage" | "abdominals" => Some(MuscleGroup::Core),
+        _ => None,
+    }
+}
+
+/// Map exercises to muscle groups with weights.
 /// Returns Vec<(MuscleGroup, weight)> where:
 /// - Primary muscles (main target) = 3 points
 /// - Secondary muscles (assistance) = 1 point
+/// Hardcoded map for default exercises, empty for unknown.
 pub fn get_muscle_groups_weighted(exercise: &str) -> Vec<(MuscleGroup, u32)> {
     match exercise {
         // Pass A
         "Knäböj" => vec![
-            (MuscleGroup::Quads, 3),      // Primary
-            (MuscleGroup::Glutes, 3),     // Primary
-            (MuscleGroup::Core, 1),       // Secondary (stabilizer)
+            (MuscleGroup::Quads, 3),
+            (MuscleGroup::Glutes, 3),
+            (MuscleGroup::Core, 1),
         ],
         "Bänkpress" => vec![
-            (MuscleGroup::Chest, 3),      // Primary
-            (MuscleGroup::Triceps, 1),    // Secondary
-            (MuscleGroup::Shoulders, 1),  // Secondary
+            (MuscleGroup::Chest, 3),
+            (MuscleGroup::Triceps, 1),
+            (MuscleGroup::Shoulders, 1),
         ],
         "Hip Thrusts" => vec![
-            (MuscleGroup::Glutes, 3),     // Primary
-            (MuscleGroup::Hamstrings, 1), // Secondary
+            (MuscleGroup::Glutes, 3),
+            (MuscleGroup::Hamstrings, 1),
         ],
         "Latsdrag" => vec![
-            (MuscleGroup::Back, 3),       // Primary
-            (MuscleGroup::Biceps, 1),     // Secondary
+            (MuscleGroup::Back, 3),
+            (MuscleGroup::Biceps, 1),
         ],
         "Leg Curls" => vec![
-            (MuscleGroup::Hamstrings, 3), // Primary (isolation)
+            (MuscleGroup::Hamstrings, 3),
         ],
         "Dips" => vec![
-            (MuscleGroup::Chest, 3),      // Primary
-            (MuscleGroup::Triceps, 3),    // Primary
+            (MuscleGroup::Chest, 3),
+            (MuscleGroup::Triceps, 3),
         ],
         "Stående vadpress" | "Sittande vadpress" => vec![
-            (MuscleGroup::Calves, 3),     // Primary (isolation)
+            (MuscleGroup::Calves, 3),
         ],
         // Pass B
         "Marklyft" => vec![
-            (MuscleGroup::Back, 3),       // Primary
-            (MuscleGroup::Hamstrings, 3), // Primary
-            (MuscleGroup::Glutes, 3),     // Primary
-            (MuscleGroup::Core, 1),       // Secondary (stabilizer)
+            (MuscleGroup::Back, 3),
+            (MuscleGroup::Hamstrings, 3),
+            (MuscleGroup::Glutes, 3),
+            (MuscleGroup::Core, 1),
         ],
         "Militärpress" => vec![
-            (MuscleGroup::Shoulders, 3),  // Primary
-            (MuscleGroup::Triceps, 1),    // Secondary
+            (MuscleGroup::Shoulders, 3),
+            (MuscleGroup::Triceps, 1),
         ],
         "Sittande rodd" => vec![
-            (MuscleGroup::Back, 3),       // Primary
-            (MuscleGroup::Biceps, 1),     // Secondary
+            (MuscleGroup::Back, 3),
+            (MuscleGroup::Biceps, 1),
         ],
         "Sidolyft" => vec![
-            (MuscleGroup::Shoulders, 3),  // Primary (isolation)
+            (MuscleGroup::Shoulders, 3),
         ],
         "Facepulls" => vec![
-            (MuscleGroup::Shoulders, 3),  // Primary (rear delts)
-            (MuscleGroup::Back, 1),       // Secondary (upper back)
+            (MuscleGroup::Shoulders, 3),
+            (MuscleGroup::Back, 1),
         ],
         "Hammercurls" => vec![
-            (MuscleGroup::Biceps, 3),     // Primary (isolation)
+            (MuscleGroup::Biceps, 3),
         ],
         // Finishers Pass A
         "Shoulder Taps" => vec![
-            (MuscleGroup::Core, 3),       // Primary (stability)
-            (MuscleGroup::Shoulders, 1),  // Secondary
+            (MuscleGroup::Core, 3),
+            (MuscleGroup::Shoulders, 1),
         ],
         "Mountain Climbers" => vec![
-            (MuscleGroup::Core, 3),       // Primary
-            (MuscleGroup::Quads, 1),      // Secondary
+            (MuscleGroup::Core, 3),
+            (MuscleGroup::Quads, 1),
         ],
         // Finishers Pass B
         "Dead Bug" => vec![
-            (MuscleGroup::Core, 3),       // Primary (stability)
+            (MuscleGroup::Core, 3),
         ],
         "Utfallssteg" => vec![
-            (MuscleGroup::Quads, 3),      // Primary
-            (MuscleGroup::Glutes, 3),     // Primary
+            (MuscleGroup::Quads, 3),
+            (MuscleGroup::Glutes, 3),
         ],
         _ => vec![],
     }
 }
 
-/// Legacy function for compatibility
-pub fn get_muscle_groups(exercise: &str) -> Vec<MuscleGroup> {
-    get_muscle_groups_weighted(exercise).into_iter().map(|(mg, _)| mg).collect()
+/// Get muscle groups for an Exercise struct, using its primary_muscles/secondary_muscles
+/// fields as fallback when the exercise name isn't in the hardcoded map.
+pub fn get_muscle_groups_for_exercise(exercise: &crate::types::Exercise) -> Vec<(MuscleGroup, u32)> {
+    let hardcoded = get_muscle_groups_weighted(&exercise.name);
+    if !hardcoded.is_empty() {
+        return hardcoded;
+    }
+    // Fallback: use muscle data from the Exercise struct (Wger API / AI-generated)
+    let mut result = Vec::new();
+    for name in &exercise.primary_muscles {
+        if let Some(mg) = parse_muscle_name(name) {
+            result.push((mg, 3));
+        }
+    }
+    for name in &exercise.secondary_muscles {
+        if let Some(mg) = parse_muscle_name(name) {
+            result.push((mg, 1));
+        }
+    }
+    result
 }
 
-/// Calculate muscle frequency in last N days
-/// Uses weighted scoring: primary muscles +3, secondary +1, multiplied by sets
-pub fn calculate_muscle_frequency(db: &Database, days: i64) -> HashMap<MuscleGroup, u32> {
+/// Calculate weekly sets per muscle group (primary muscles only).
+/// Counts actual completed sets for each muscle group where the exercise
+/// targets that muscle as primary (weight == 3).
+/// Research suggests 10-20 sets per muscle group per week is optimal.
+pub fn calculate_weekly_sets(db: &Database, days: i64) -> HashMap<MuscleGroup, u32> {
     let cutoff = chrono::Utc::now().timestamp() - (days * 86400);
-    let mut freq: HashMap<MuscleGroup, u32> = HashMap::new();
-    
-    // Initialize all muscles to 0
+    let mut sets: HashMap<MuscleGroup, u32> = HashMap::new();
+
     for muscle in MuscleGroup::all() {
-        freq.insert(muscle, 0);
+        sets.insert(muscle, 0);
     }
-    
+
+    let routine = crate::storage::load_active_routine();
+    let exercise_lookup: HashMap<String, &crate::types::Exercise> = routine.as_ref()
+        .map(|r| r.passes.iter()
+            .flat_map(|p| p.exercises.iter().chain(p.finishers.iter()))
+            .map(|e| (e.name.clone(), e))
+            .collect())
+        .unwrap_or_default();
+
     for session in &db.sessions {
         if session.timestamp < cutoff { continue; }
-        
+
         for exercise in &session.exercises {
             let sets_completed = exercise.sets.len() as u32;
             if sets_completed == 0 { continue; }
-            
-            for (muscle, weight) in get_muscle_groups_weighted(&exercise.name) {
-                // Score = muscle_weight * sets_completed
-                *freq.entry(muscle).or_insert(0) += weight * sets_completed;
-            }
-        }
-    }
-    
-    freq
-}
 
-/// Calculate average rest time across all sessions
-pub fn calculate_avg_rest_time(db: &Database) -> f64 {
-    let mut total_rest: i64 = 0;
-    let mut count: usize = 0;
-    
-    for session in &db.sessions {
-        for exercise in &session.exercises {
-            for set in &exercise.sets {
-                if let Some(rest) = set.rest_before_secs {
-                    if rest > 0 && rest < 600 { // Ignore unrealistic values
-                        total_rest += rest;
-                        count += 1;
-                    }
+            let muscles = get_muscle_groups_weighted(&exercise.name);
+            let muscles = if muscles.is_empty() {
+                exercise_lookup.get(&exercise.name)
+                    .map(|e| get_muscle_groups_for_exercise(e))
+                    .unwrap_or_default()
+            } else {
+                muscles
+            };
+
+            // Only count primary muscles (weight == 3)
+            for (muscle, weight) in muscles {
+                if weight >= 3 {
+                    *sets.entry(muscle).or_insert(0) += sets_completed;
                 }
             }
         }
     }
-    
-    if count == 0 { return 0.0; }
-    total_rest as f64 / count as f64
-}
 
-/// Get rest time stats for an exercise
-pub fn get_exercise_rest_stats(db: &Database, exercise_name: &str) -> (f64, f64, f64) {
-    let mut rest_times: Vec<i64> = Vec::new();
-    
-    for session in &db.sessions {
-        for exercise in &session.exercises {
-            if exercise.name == exercise_name {
-                for set in &exercise.sets {
-                    if let Some(rest) = set.rest_before_secs {
-                        if rest > 0 && rest < 600 {
-                            rest_times.push(rest);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    if rest_times.is_empty() {
-        return (0.0, 0.0, 0.0);
-    }
-    
-    rest_times.sort();
-    let avg = rest_times.iter().sum::<i64>() as f64 / rest_times.len() as f64;
-    let min = *rest_times.first().unwrap() as f64;
-    let max = *rest_times.last().unwrap() as f64;
-    
-    (avg, min, max)
-}
-
-/// E1RM history for an exercise (for graphing)
-pub fn get_e1rm_history(db: &Database, exercise_name: &str) -> Vec<(i64, f64)> {
-    let mut history: Vec<(i64, f64)> = Vec::new();
-    
-    for session in &db.sessions {
-        if let Some(e1rm) = session_best_e1rm(session, exercise_name) {
-            history.push((session.timestamp, e1rm));
-        }
-    }
-    
-    history.sort_by_key(|(ts, _)| *ts);
-    history
+    sets
 }
 
 /// Power score history (for graphing)
@@ -361,28 +337,15 @@ pub fn get_power_score_history(db: &Database) -> Vec<(i64, f64)> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct StatsSummary {
     pub power_score: f64,
-    pub power_to_weight: f64,
     pub bodyweight: f64,
-    pub avg_efficiency: f64,
-    pub avg_rest_time: f64,
     pub total_sessions: usize,
-    pub total_volume: f64,
-    pub muscle_frequency: HashMap<MuscleGroup, u32>,
+    pub weekly_sets: HashMap<MuscleGroup, u32>,
     pub e1rm_by_exercise: HashMap<String, f64>,
 }
 
 pub fn get_stats_summary(db: &Database, bodyweight: f64) -> StatsSummary {
     let power_score = calculate_power_score(db);
-    
-    // Calculate average efficiency
-    let avg_efficiency = if db.sessions.is_empty() {
-        0.0
-    } else {
-        db.sessions.iter()
-            .map(calculate_efficiency)
-            .sum::<f64>() / db.sessions.len() as f64
-    };
-    
+
     // Get best E1RM for each exercise
     let mut e1rm_by_exercise: HashMap<String, f64> = HashMap::new();
     for session in &db.sessions {
@@ -394,16 +357,12 @@ pub fn get_stats_summary(db: &Database, bodyweight: f64) -> StatsSummary {
             }
         }
     }
-    
+
     StatsSummary {
         power_score,
-        power_to_weight: calculate_power_to_weight(db, bodyweight),
         bodyweight,
-        avg_efficiency,
-        avg_rest_time: calculate_avg_rest_time(db),
         total_sessions: db.sessions.len(),
-        total_volume: db.sessions.iter().map(|s| s.total_volume).sum(),
-        muscle_frequency: calculate_muscle_frequency(db, 7),
+        weekly_sets: calculate_weekly_sets(db, 7),
         e1rm_by_exercise,
     }
 }

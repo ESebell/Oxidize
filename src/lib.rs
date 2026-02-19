@@ -3,6 +3,7 @@ mod types;
 mod storage;
 mod supabase;
 mod stats;
+mod pages;
 
 use wasm_bindgen::prelude::*;
 use leptos::*;

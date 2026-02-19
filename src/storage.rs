@@ -199,82 +199,6 @@ impl Database {
         sessions.into_iter().take(limit).collect()
     }
 
-    pub fn get_exercise_stats(&self, exercise_name: &str) -> ExerciseStats {
-        let mut stats = ExerciseStats {
-            name: exercise_name.to_string(),
-            current_weight: 0.0,
-            estimated_1rm: 0.0,
-            total_volume: 0.0,
-            best_set: None,
-            sessions_count: 0,
-            avg_rest_time: 0.0,
-            volume_trend: Vec::new(),
-            one_rm_trend: Vec::new(),
-        };
-
-        let mut rest_times: Vec<i64> = Vec::new();
-
-        for session in &self.sessions {
-            for ex in &session.exercises {
-                if ex.name == exercise_name {
-                    stats.sessions_count += 1;
-                    let mut session_volume = 0.0;
-                    let mut session_best_1rm = 0.0;
-
-                    for set in &ex.sets {
-                        let volume = set.weight * set.reps as f64;
-                        stats.total_volume += volume;
-                        session_volume += volume;
-
-                        // 1RM (Epley formula)
-                        let one_rm = if set.reps == 1 {
-                            set.weight
-                        } else {
-                            set.weight * (1.0 + set.reps as f64 / 30.0)
-                        };
-
-                        if one_rm > stats.estimated_1rm {
-                            stats.estimated_1rm = one_rm;
-                            stats.best_set = Some(set.clone());
-                        }
-                        if one_rm > session_best_1rm {
-                            session_best_1rm = one_rm;
-                        }
-
-                        if let Some(rest) = set.rest_before_secs {
-                            if rest > 0 {
-                                rest_times.push(rest);
-                            }
-                        }
-                    }
-
-                    stats.volume_trend.push((session.timestamp, session_volume));
-                    if session_best_1rm > 0.0 {
-                        stats.one_rm_trend.push((session.timestamp, session_best_1rm));
-                    }
-                }
-            }
-        }
-
-        if let Some(last) = self.last_weights.get(exercise_name) {
-            stats.current_weight = last.weight;
-        }
-
-        if !rest_times.is_empty() {
-            stats.avg_rest_time = rest_times.iter().sum::<i64>() as f64 / rest_times.len() as f64;
-        }
-
-        stats
-    }
-
-    pub fn get_all_exercise_stats(&self) -> Vec<ExerciseStats> {
-        let names = get_all_exercise_names();
-        names.iter()
-            .map(|n| self.get_exercise_stats(n))
-            .filter(|s| s.sessions_count > 0)
-            .collect()
-    }
-
     pub fn get_total_stats(&self) -> TotalStats {
         let total_sessions = self.sessions.len();
         let total_volume: f64 = self.sessions.iter().map(|s| s.total_volume).sum();
@@ -298,81 +222,71 @@ impl Database {
     }
 }
 
-// Routines defined here to avoid circular deps
-pub fn get_routine_a() -> Routine {
-    Routine {
+/// Single source of truth for the default routine.
+/// Used as fallback when no Supabase routine is cached.
+pub fn create_default_routine() -> SavedRoutine {
+    let pass_a = Pass {
         name: "Pass A".to_string(),
-        focus: "Ben, Press & Triceps".to_string(),
+        description: "Ben · Press · Triceps".to_string(),
         exercises: vec![
             Exercise::standard("Knäböj", 3, "5-8"),
             Exercise::standard("Bänkpress", 3, "5-8"),
             Exercise::standard("Hip Thrusts", 3, "8-12"),
             Exercise::standard("Latsdrag", 3, "8-10"),
-            Exercise::superset("Leg Curls", 2, "12-15", "Dips", None),
-            Exercise::superset("Dips", 2, "AMRAP", "Leg Curls", None),
+            Exercise::superset("Leg Curls", 2, "12-15", "Dips", Some("Ben/Triceps")),
+            Exercise::superset("Dips", 2, "AMRAP", "Leg Curls", Some("Ben/Triceps")),
             Exercise::standard("Stående vadpress", 3, "12-15"),
         ],
         finishers: vec![
             Exercise::finisher("Shoulder Taps", 3, "20"),
             Exercise::timed_finisher("Mountain Climbers", 3, 30),
         ],
-    }
-}
+    };
 
-pub fn get_routine_b() -> Routine {
-    Routine {
+    let pass_b = Pass {
         name: "Pass B".to_string(),
-        focus: "Rygg, Axlar & Biceps".to_string(),
+        description: "Rygg · Axlar · Biceps".to_string(),
         exercises: vec![
             Exercise::standard("Marklyft", 3, "5"),
             Exercise::standard("Militärpress", 3, "8-10"),
             Exercise::standard("Sittande rodd", 3, "10-12"),
-            Exercise::superset("Sidolyft", 3, "12-15", "Hammercurls", None),
-            Exercise::superset("Hammercurls", 3, "10-12", "Sidolyft", None),
-            Exercise::superset("Facepulls", 3, "15", "Sittande vadpress", None),
-            Exercise::superset("Sittande vadpress", 3, "15-20", "Facepulls", None),
+            Exercise::superset("Sidolyft", 3, "12-15", "Hammercurls", Some("Axlar/Armar")),
+            Exercise::superset("Hammercurls", 3, "10-12", "Sidolyft", Some("Axlar/Armar")),
+            Exercise::superset("Facepulls", 3, "15", "Sittande vadpress", Some("Rygg/Vader")),
+            Exercise::superset("Sittande vadpress", 3, "15-20", "Facepulls", Some("Rygg/Vader")),
         ],
         finishers: vec![
-            Exercise::finisher("Dead Bug", 3, "12/sida"),
+            Exercise::finisher("Dead Bug", 3, "12"),
             Exercise::finisher("Utfallssteg", 3, "20"),
         ],
-    }
-}
+    };
 
-pub fn get_all_exercise_names() -> Vec<String> {
-    let a = get_routine_a();
-    let b = get_routine_b();
-    let mut names: Vec<String> = a.exercises.iter().map(|e| e.name.clone()).collect();
-    names.extend(a.finishers.iter().map(|e| e.name.clone()));
-    names.extend(b.exercises.iter().map(|e| e.name.clone()));
-    names.extend(b.finishers.iter().map(|e| e.name.clone()));
-    names.sort();
-    names.dedup();
-    names
+    let now = js_sys::Date::now() as i64 / 1000;
+    let id = format!("default_{}", now);
+
+    SavedRoutine {
+        id,
+        user_id: None,
+        name: "Överkropp/Underkropp".to_string(),
+        focus: "Styrka & Hypertrofi".to_string(),
+        passes: vec![pass_a, pass_b],
+        is_active: true,
+        created_at: now,
+    }
 }
 
 pub fn get_workout(pass_name: &str) -> Option<WorkoutData> {
     let db = load_data();
-    
-    // Try to find pass in active routine from Supabase
-    if let Some(saved_routine) = load_active_routine() {
-        if let Some(pass) = saved_routine.passes.iter().find(|p| p.name == pass_name) {
-            let routine = Routine {
-                name: pass.name.clone(),
-                focus: saved_routine.focus.clone(),
-                exercises: pass.exercises.clone(),
-                finishers: pass.finishers.clone(),
-            };
-            
-            return Some(create_workout_data(routine, &db));
-        }
-    }
-    
-    // Fallback to hardcoded routines for backwards compatibility
-    let routine = match pass_name {
-        "A" | "Pass A" => get_routine_a(),
-        "B" | "Pass B" => get_routine_b(),
-        _ => return None,
+
+    // Use active routine from Supabase, fallback to defaults
+    let saved_routine = load_active_routine().unwrap_or_else(create_default_routine);
+
+    let pass = saved_routine.passes.iter().find(|p| p.name == pass_name)?;
+    let routine = Routine {
+        name: pass.name.clone(),
+        focus: saved_routine.focus.clone(),
+        exercises: pass.exercises.clone(),
+        finishers: pass.finishers.clone(),
     };
 
     Some(create_workout_data(routine, &db))
