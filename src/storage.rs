@@ -156,7 +156,7 @@ pub fn migrate_exercise_names(db: &mut Database) {
     }
 }
 
-const EXERCISE_RENAMES: &[(&str, &str)] = &[
+pub const EXERCISE_RENAMES: &[(&str, &str)] = &[
     ("Knäböj", "Squats"),
     ("Bänkpress", "Bench Press"),
     ("Marklyft", "Deadlift"),
