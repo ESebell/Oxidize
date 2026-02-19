@@ -2562,7 +2562,9 @@ button.search-result-item:active {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--accent-a);
 }
 
 .result-info {

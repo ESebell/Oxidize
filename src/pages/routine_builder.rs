@@ -185,13 +185,20 @@ pub fn RoutineBuilder(
 
     let trigger_search = move || {
         let query = search_query.get();
+        web_sys::console::log_1(&format!("trigger_search: query='{}' len={}", query, query.len()).into());
         if query.len() < 2 { return; }
 
         set_searching.set(true);
         spawn_local(async move {
             match search_wger_exercises(&query).await {
-                Ok(results) => set_search_results.set(results),
-                Err(_) => set_search_results.set(vec![]),
+                Ok(results) => {
+                    web_sys::console::log_1(&format!("search results: {} found", results.len()).into());
+                    set_search_results.set(results);
+                }
+                Err(e) => {
+                    web_sys::console::log_1(&format!("search error: {:?}", e).into());
+                    set_search_results.set(vec![]);
+                }
             }
             set_searching.set(false);
         });
@@ -494,7 +501,11 @@ pub fn RoutineBuilder(
                                                 }
                                             }).collect_view()}
 
-                                            <button class="add-exercise-btn" on:click=move |_| set_adding_exercise_to.set(Some((idx, false)))>
+                                            <button class="add-exercise-btn" on:click=move |_| {
+                                                set_search_query.set(String::new());
+                                                set_search_results.set(vec![]);
+                                                set_adding_exercise_to.set(Some((idx, false)));
+                                            }>
                                                 "+ Lägg till övning"
                                             </button>
 
@@ -508,7 +519,11 @@ pub fn RoutineBuilder(
                                                 }
                                             }).collect_view()}
 
-                                            <button class="add-exercise-btn finisher-btn" on:click=move |_| set_adding_exercise_to.set(Some((idx, true)))>
+                                            <button class="add-exercise-btn finisher-btn" on:click=move |_| {
+                                                set_search_query.set(String::new());
+                                                set_search_results.set(vec![]);
+                                                set_adding_exercise_to.set(Some((idx, true)));
+                                            }>
                                                 "+ Lägg till finisher"
                                             </button>
                                         </div>
@@ -591,20 +606,24 @@ pub fn RoutineBuilder(
                                             view! { <span></span> }.into_view()
                                         }}
 
-                                        <form class="search-box" on:submit=move |e| {
-                                            e.prevent_default();
-                                            trigger_search();
-                                        }>
+                                        <div class="search-box">
                                             <input
-                                                type="text"
+                                                type="search"
+                                                enterkeyhint="search"
                                                 placeholder={if is_finisher { "Sök kroppsviktsövning..." } else { "Sök (t.ex. bench, squat)" }}
                                                 prop:value=search_query
                                                 on:input=move |e| set_search_query.set(event_target_value(&e))
+                                                on:keydown=move |e| {
+                                                    if e.key() == "Enter" {
+                                                        e.prevent_default();
+                                                        trigger_search();
+                                                    }
+                                                }
                                             />
-                                            <button type="submit" disabled=move || searching.get()>
+                                            <button type="button" on:click=move |_| trigger_search() disabled=move || searching.get()>
                                                 {move || if searching.get() { "..." } else { "Sök" }}
                                             </button>
-                                        </form>
+                                        </div>
 
                                         <div class="search-results">
                                             {move || search_results.get().into_iter().map(|ex| {
@@ -641,7 +660,7 @@ pub fn RoutineBuilder(
                                                         {if has_thumb {
                                                             view! { <img src=thumb_url class="result-thumb" /> }.into_view()
                                                         } else {
-                                                            view! { <div class="result-thumb placeholder">"🏋"</div> }.into_view()
+                                                            view! { <div class="result-thumb placeholder">"O"</div> }.into_view()
                                                         }}
                                                         <div class="result-info">
                                                             <span class="result-name">{&ex.name}</span>
