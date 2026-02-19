@@ -185,24 +185,23 @@ pub fn RoutineBuilder(
 
     let trigger_search = move || {
         let query = search_query.get();
-        web_sys::console::log_1(&format!("trigger_search: query='{}' len={}", query, query.len()).into());
-        if query.len() < 2 { return; }
+        if query.len() < 2 {
+            set_search_results.set(vec![]);
+            return;
+        }
 
         set_searching.set(true);
         spawn_local(async move {
             match search_wger_exercises(&query).await {
-                Ok(results) => {
-                    web_sys::console::log_1(&format!("search results: {} found", results.len()).into());
-                    set_search_results.set(results);
-                }
-                Err(e) => {
-                    web_sys::console::log_1(&format!("search error: {:?}", e).into());
-                    set_search_results.set(vec![]);
-                }
+                Ok(results) => set_search_results.set(results),
+                Err(_) => set_search_results.set(vec![]),
             }
             set_searching.set(false);
         });
     };
+
+    // Debounced auto-search: store timeout handle so dropping cancels previous
+    let debounce_handle = store_value(None::<gloo_timers::callback::Timeout>);
 
     let add_pass = move |_| {
         let mut p = passes.get();
@@ -610,19 +609,33 @@ pub fn RoutineBuilder(
                                             <input
                                                 type="search"
                                                 enterkeyhint="search"
-                                                placeholder={if is_finisher { "Sök kroppsviktsövning..." } else { "Sök (t.ex. bench, squat)" }}
+                                                placeholder={if is_finisher { "Sök övning..." } else { "Sök (t.ex. bench, squat)" }}
                                                 prop:value=search_query
-                                                on:input=move |e| set_search_query.set(event_target_value(&e))
+                                                on:input=move |e| {
+                                                    let val = event_target_value(&e);
+                                                    set_search_query.set(val.clone());
+                                                    if val.len() >= 2 {
+                                                        debounce_handle.set_value(Some(
+                                                            gloo_timers::callback::Timeout::new(400, move || {
+                                                                trigger_search();
+                                                            })
+                                                        ));
+                                                    } else {
+                                                        debounce_handle.set_value(None);
+                                                        set_search_results.set(vec![]);
+                                                    }
+                                                }
                                                 on:keydown=move |e| {
                                                     if e.key() == "Enter" {
                                                         e.prevent_default();
+                                                        debounce_handle.set_value(None);
                                                         trigger_search();
                                                     }
                                                 }
                                             />
-                                            <button type="button" on:click=move |_| trigger_search() disabled=move || searching.get()>
-                                                {move || if searching.get() { "..." } else { "Sök" }}
-                                            </button>
+                                            {move || searching.get().then(|| view! {
+                                                <span class="search-spinner">"..."</span>
+                                            })}
                                         </div>
 
                                         <div class="search-results">
