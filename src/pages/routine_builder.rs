@@ -196,7 +196,6 @@ pub fn RoutineBuilder(
             set_searching.set(false);
         });
     };
-    let do_search = move |_: web_sys::MouseEvent| trigger_search();
 
     let add_pass = move |_| {
         let mut p = passes.get();
@@ -592,29 +591,28 @@ pub fn RoutineBuilder(
                                             view! { <span></span> }.into_view()
                                         }}
 
-                                        <div class="search-box">
+                                        <form class="search-box" on:submit=move |e| {
+                                            e.prevent_default();
+                                            trigger_search();
+                                        }>
                                             <input
                                                 type="text"
                                                 placeholder={if is_finisher { "Sök kroppsviktsövning..." } else { "Sök (t.ex. bench, squat)" }}
                                                 prop:value=search_query
                                                 on:input=move |e| set_search_query.set(event_target_value(&e))
-                                                on:keydown=move |e| {
-                                                    if e.key() == "Enter" {
-                                                        trigger_search();
-                                                    }
-                                                }
                                             />
-                                            <button on:click=do_search disabled=searching>
-                                                {if searching.get() { "..." } else { "Sök" }}
+                                            <button type="submit" disabled=move || searching.get()>
+                                                {move || if searching.get() { "..." } else { "Sök" }}
                                             </button>
-                                        </div>
+                                        </form>
 
                                         <div class="search-results">
                                             {move || search_results.get().into_iter().map(|ex| {
                                                 let ex_clone = ex.clone();
+                                                let thumb_url = ex.image_url.clone().unwrap_or_default();
+                                                let has_thumb = !thumb_url.is_empty();
                                                 view! {
-                                                    <div class="search-result-item" on:click=move |_| {
-                                                        // Read fresh values from signal to avoid stale captures
+                                                    <button class="search-result-item" on:click=move |_| {
                                                         let Some((pi, fin)) = adding_exercise_to.get() else { return };
                                                         let mut p = passes.get();
                                                         if let Some(pass) = p.get_mut(pi) {
@@ -640,14 +638,16 @@ pub fn RoutineBuilder(
                                                         set_search_results.set(vec![]);
                                                         set_search_query.set(String::new());
                                                     }>
-                                                        {ex.image_url.as_ref().map(|url| view! {
-                                                            <img src=url.clone() class="result-thumb" />
-                                                        })}
+                                                        {if has_thumb {
+                                                            view! { <img src=thumb_url class="result-thumb" /> }.into_view()
+                                                        } else {
+                                                            view! { <div class="result-thumb placeholder">"🏋"</div> }.into_view()
+                                                        }}
                                                         <div class="result-info">
                                                             <span class="result-name">{&ex.name}</span>
                                                             <span class="result-muscles">{ex.primary_muscles.join(", ")}</span>
                                                         </div>
-                                                    </div>
+                                                    </button>
                                                 }
                                             }).collect_view()}
                                         </div>
