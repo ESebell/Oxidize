@@ -43,6 +43,9 @@ struct BodyweightChartCard: View {
             }
             .frame(height: 150)
             .chartYScale(domain: yDomain)
+            .chartPlotStyle { plot in
+                plot.clipped()
+            }
             .chartXAxis {
                 AxisMarks { _ in
                     AxisGridLine().foregroundStyle(Theme.border)
