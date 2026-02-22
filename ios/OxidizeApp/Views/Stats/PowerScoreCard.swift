@@ -51,24 +51,36 @@ struct PowerScoreCard: View {
                 }
             }
 
-            // Power score history chart
+            // Power score sparkline
             if vm.powerScoreHistory.count > 1 {
+                let data = Array(vm.powerScoreHistory.suffix(12))
+                let values = data.map(\.1)
+                let minVal = (values.min() ?? 0) * 0.95
+                let maxVal = (values.max() ?? 1) * 1.05
+
                 Chart {
-                    ForEach(Array(vm.powerScoreHistory.suffix(10).enumerated()), id: \.offset) { index, point in
-                        BarMark(
+                    ForEach(Array(data.enumerated()), id: \.offset) { index, point in
+                        LineMark(
                             x: .value("Session", index),
                             y: .value("Score", point.1)
                         )
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Theme.accentA, Theme.accentA.opacity(0.3)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
+                        .foregroundStyle(Theme.accentA)
+                        .lineStyle(StrokeStyle(lineWidth: 2))
+                        .interpolationMethod(.catmullRom)
+                    }
+
+                    // End dot
+                    if let last = data.last {
+                        PointMark(
+                            x: .value("Session", data.count - 1),
+                            y: .value("Score", last.1)
                         )
+                        .foregroundStyle(Theme.accentA)
+                        .symbolSize(30)
                     }
                 }
-                .frame(height: 80)
+                .frame(height: 50)
+                .chartYScale(domain: minVal...maxVal)
                 .chartYAxis(.hidden)
                 .chartXAxis(.hidden)
             }

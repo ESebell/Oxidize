@@ -13,6 +13,7 @@ struct RoutineBuilderView: View {
                 // Name and focus
                 VStack(spacing: 8) {
                     TextField("Rutinnamn", text: $vm.routineName)
+                        .font(.mono(size: 16, weight: .bold))
                         .darkInputStyle()
                     TextField("Fokus (t.ex. Styrka & Hypertrofi)", text: $vm.routineFocus)
                         .font(.mono(size: 14))
