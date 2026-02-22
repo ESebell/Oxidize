@@ -11,47 +11,46 @@ struct DashboardView: View {
 
             ScrollView {
                 VStack(spacing: 24) {
-                    // Logo
+                    // Logo + settings
                     Text("OXIDIZE")
                         .font(.mono(size: 14, weight: .bold))
                         .foregroundStyle(Theme.fgMuted)
                         .tracking(6)
-                        .padding(.leading, 6)
+                        .padding(.trailing, -6)
+                        .frame(maxWidth: .infinity)
+                        .overlay(alignment: .trailing) {
+                            Button {
+                                path.append(AppDestination.settings)
+                            } label: {
+                                Image(systemName: "gearshape")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(Theme.fgMuted)
+                            }
+                        }
+                        .padding(.horizontal)
                         .padding(.top, 8)
 
-                    // Stats + settings gear on right
-                    HStack {
-                        Spacer()
-                        HStack(spacing: 40) {
-                            VStack(spacing: 2) {
-                                Text("\(vm.totalStats.totalSessions)")
-                                    .font(.mono(size: 36, weight: .bold))
-                                    .foregroundStyle(Theme.fgPrimary)
-                                Text("PASS")
-                                    .font(.mono(size: 11, weight: .medium))
-                                    .foregroundStyle(Theme.fgMuted)
-                                    .tracking(2)
-                            }
-                            VStack(spacing: 2) {
-                                Text("\(Int(vm.totalStats.totalVolume / 1000))")
-                                    .font(.mono(size: 36, weight: .bold))
-                                    .foregroundStyle(Theme.fgPrimary)
-                                Text("TON")
-                                    .font(.mono(size: 11, weight: .medium))
-                                    .foregroundStyle(Theme.fgMuted)
-                                    .tracking(2)
-                            }
-                        }
-                        Spacer()
-                        Button {
-                            path.append(AppDestination.settings)
-                        } label: {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 18))
+                    // Stats
+                    HStack(spacing: 40) {
+                        VStack(spacing: 2) {
+                            Text("\(vm.totalStats.totalSessions)")
+                                .font(.mono(size: 36, weight: .bold))
+                                .foregroundStyle(Theme.fgPrimary)
+                            Text("PASS")
+                                .font(.mono(size: 11, weight: .medium))
                                 .foregroundStyle(Theme.fgMuted)
+                                .tracking(2)
+                        }
+                        VStack(spacing: 2) {
+                            Text("\(Int(vm.totalStats.totalVolume / 1000))")
+                                .font(.mono(size: 36, weight: .bold))
+                                .foregroundStyle(Theme.fgPrimary)
+                            Text("TON")
+                                .font(.mono(size: 11, weight: .medium))
+                                .foregroundStyle(Theme.fgMuted)
+                                .tracking(2)
                         }
                     }
-                    .padding(.horizontal)
 
                     // Paused workout banner
                     if let paused = vm.pausedWorkout {
@@ -152,8 +151,7 @@ struct DashboardView: View {
                 .padding(.vertical)
             }
         }
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarHidden(true)
         .task {
             await vm.loadData()
         }
