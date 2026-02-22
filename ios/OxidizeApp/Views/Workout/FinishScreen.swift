@@ -46,47 +46,32 @@ struct FinishScreen: View {
                     }
                 }
 
-                // RPE selector
+                // RPE selector (1-10, Apple's effort scale)
                 VStack(spacing: 8) {
                     Text("ANSTRÄNGNING")
                         .font(.mono(size: 10, weight: .medium))
                         .foregroundStyle(Theme.fgMuted)
                         .tracking(2)
 
-                    HStack(spacing: 8) {
-                        ForEach(1...5, id: \.self) { level in
-                            let isSelected = vm.selectedRPE == level
-                            Button {
-                                if vm.selectedRPE == level {
-                                    vm.selectedRPE = nil
-                                } else {
-                                    vm.selectedRPE = level
-                                }
-                            } label: {
-                                Text("\(level)")
-                                    .font(.mono(size: 16, weight: .bold))
-                                    .foregroundStyle(isSelected ? Theme.bgPrimary : (vm.selectedRPE == nil ? Theme.fgSecondary : Theme.fgMuted))
-                                    .frame(width: 44, height: 44)
-                                    .background(isSelected ? Theme.accentA : Color.clear)
-                                    .overlay(
-                                        Rectangle()
-                                            .stroke(isSelected ? Theme.accentA : Theme.border, lineWidth: isSelected ? 2 : 1)
-                                    )
+                    VStack(spacing: 6) {
+                        HStack(spacing: 6) {
+                            ForEach(1...5, id: \.self) { level in
+                                rpeButton(level)
+                            }
+                        }
+                        HStack(spacing: 6) {
+                            ForEach(6...10, id: \.self) { level in
+                                rpeButton(level)
                             }
                         }
                     }
 
-                    HStack {
-                        Text("LÄTT")
-                            .font(.mono(size: 9))
-                            .foregroundStyle(Theme.fgMuted)
-                        Spacer()
-                        Text("MAXIMALT")
-                            .font(.mono(size: 9))
-                            .foregroundStyle(Theme.fgMuted)
+                    if let rpe = vm.selectedRPE {
+                        Text("\(rpe) — \(effortLabel(rpe))")
+                            .font(.mono(size: 13, weight: .bold))
+                            .foregroundStyle(effortColor(rpe))
+                            .padding(.top, 2)
                     }
-                    .padding(.horizontal, 4)
-                    .frame(width: CGFloat(5 * 44 + 4 * 8))
                 }
 
                 if vm.isSaving {
@@ -111,6 +96,15 @@ struct FinishScreen: View {
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                     }
                     .padding(.horizontal, 32)
+
+                    Button {
+                        vm.isFinished = false
+                    } label: {
+                        Text("TILLBAKA TILL PASSET")
+                            .font(.mono(size: 12, weight: .medium))
+                            .tracking(1)
+                            .foregroundStyle(Theme.fgMuted)
+                    }
                 }
 
                 Spacer(minLength: 40)
@@ -122,6 +116,43 @@ struct FinishScreen: View {
             }
         } message: {
             Text("Passet är sparat lokalt men kunde inte synkas till Supabase efter 3 försök. Stäng inte appen förrän den har synkat.")
+        }
+    }
+
+    @ViewBuilder
+    private func rpeButton(_ level: Int) -> some View {
+        let isSelected = vm.selectedRPE == level
+        let color = effortColor(level)
+        Button {
+            vm.selectedRPE = vm.selectedRPE == level ? nil : level
+        } label: {
+            Text("\(level)")
+                .font(.mono(size: 14, weight: .bold))
+                .foregroundStyle(isSelected ? Theme.bgPrimary : (vm.selectedRPE == nil ? Theme.fgSecondary : Theme.fgMuted))
+                .frame(width: 38, height: 38)
+                .background(isSelected ? color : Color.clear)
+                .overlay(
+                    Rectangle()
+                        .stroke(isSelected ? color : Theme.border, lineWidth: isSelected ? 2 : 1)
+                )
+        }
+    }
+
+    private func effortColor(_ level: Int) -> Color {
+        switch level {
+        case 1...3: return Theme.accentA       // Lätt — green
+        case 4...6: return Color(.systemYellow) // Måttlig
+        case 7...8: return Color(.systemOrange) // Svår
+        default: return Theme.danger            // Max/Extrem
+        }
+    }
+
+    private func effortLabel(_ level: Int) -> String {
+        switch level {
+        case 1...3: return "LÄTT"
+        case 4...6: return "MÅTTLIG"
+        case 7...8: return "SVÅR"
+        default: return "MAXIMAL"
         }
     }
 }
