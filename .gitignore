@@ -12,8 +12,17 @@
 .DS_Store
 Thumbs.db
 
+# Claude Code
+.claude/
+
 # Tauri (we're using PWA now)
 /src-tauri/
+
+# iOS
+ios/*.xcodeproj/
+ios/Info.plist
+ios/OxidizeApp/Info.plist
+ios/OxidizeApp/OxidizeApp.entitlements
 
 # Logs
 *.log
