@@ -217,6 +217,9 @@ struct SettingsView: View {
                         .padding(.horizontal)
                     }
 
+                    // HealthKit
+                    HealthKitSettingsCard()
+
                     // Account
                     VStack(alignment: .leading, spacing: 8) {
                         Text("KONTO")

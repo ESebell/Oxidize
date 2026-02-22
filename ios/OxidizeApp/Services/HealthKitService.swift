@@ -29,6 +29,14 @@ final class HealthKitService: Sendable {
         }
     }
 
+    // MARK: - Status
+
+    /// Returns .notDetermined, .sharingDenied, or .sharingAuthorized for write access
+    func authorizationStatus() -> HKAuthorizationStatus {
+        guard isAvailable else { return .notDetermined }
+        return store.authorizationStatus(for: bodyMassType)
+    }
+
     // MARK: - Bodyweight
 
     func fetchLatestBodyweight() async -> (weight: Double, date: Date)? {
