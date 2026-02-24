@@ -11,6 +11,7 @@ struct StatsView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     PowerScoreCard(vm: vm)
+                    BodyHeatMapCard(vm: vm)
                     WeeklyVolumeCard(vm: vm)
                     ProgressionCard(vm: vm)
                     if !vm.bodyweightHistory.isEmpty {

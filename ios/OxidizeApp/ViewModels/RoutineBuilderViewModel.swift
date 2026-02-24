@@ -81,7 +81,7 @@ final class RoutineBuilderViewModel {
             secondaryMuscles: wger.secondaryMuscles,
             imageUrl: wger.imageUrl,
             equipment: wger.equipment,
-            wgerId: wger.id
+            wgerId: wger.baseId
         )
 
         if addingToFinishers {

@@ -6,7 +6,7 @@ struct WeeklyVolumeCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("VECKOVOLYM PER MUSKEL")
+            Text("VECKOVOLYM PER MUSKELGRUPP")
                 .font(.mono(size: 12, weight: .bold))
                 .foregroundStyle(Theme.fgPrimary)
                 .tracking(1)
@@ -50,6 +50,7 @@ struct WeeklyVolumeCard: View {
             }
             .font(.mono(size: 10))
             .foregroundStyle(Theme.fgMuted)
+            .frame(maxWidth: .infinity)
         }
         .padding()
         .background(Theme.bgCard)

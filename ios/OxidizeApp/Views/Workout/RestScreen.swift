@@ -15,7 +15,7 @@ struct RestScreen: View {
 
             Text(formatTime(vm.restElapsed))
                 .font(.mono(size: 56, weight: .bold))
-                .foregroundStyle(Theme.accentB)
+                .foregroundStyle(Color(hex: "#ffaa00"))
 
             if let next = vm.currentExercise {
                 VStack(spacing: 8) {
@@ -40,13 +40,24 @@ struct RestScreen: View {
                 Text("FORTSÄTT")
                     .font(.mono(size: 16, weight: .bold))
                     .tracking(2)
-                    .frame(maxWidth: .infinity)
-                    .padding()
+                    .padding(.vertical, 16)
+                    .padding(.horizontal, 48)
                     .background(Color.white)
                     .foregroundStyle(Theme.bgPrimary)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             }
             .padding(.horizontal, 32)
+
+            if vm.justFinishedIdx != nil {
+                Button {
+                    vm.addExtraSet()
+                } label: {
+                    Text("+ LÄGG TILL SET")
+                        .font(.mono(size: 12, weight: .medium))
+                        .tracking(1)
+                        .foregroundStyle(Theme.fgSecondary)
+                }
+            }
 
             Spacer()
         }

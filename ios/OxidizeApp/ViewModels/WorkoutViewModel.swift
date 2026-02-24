@@ -17,6 +17,7 @@ final class WorkoutViewModel {
     var isSaving = false
     var showSyncWarning = false
     var selectedRPE: Int? = nil
+    var justFinishedIdx: Int? = nil
 
     // Timer (for timed exercises)
     var timerRunning = false
@@ -156,6 +157,22 @@ final class WorkoutViewModel {
     }
 
     func continueWorkout() {
+        justFinishedIdx = nil
+        isResting = false
+    }
+
+    func addExtraSet() {
+        guard let idx = justFinishedIdx else { return }
+        exercises[idx].exercise.sets += 1
+
+        if exercises[idx].exercise.isSuperset, let partnerIdx = findPartnerIdx(for: idx) {
+            exercises[partnerIdx].exercise.sets += 1
+            currentIdx = min(idx, partnerIdx)
+        } else {
+            currentIdx = idx
+        }
+
+        justFinishedIdx = nil
         isResting = false
     }
 
@@ -205,7 +222,7 @@ final class WorkoutViewModel {
 
         let records: [ExerciseRecord] = exercises
             .filter { !$0.setsCompleted.isEmpty }
-            .map { ExerciseRecord(name: $0.exercise.name, sets: $0.setsCompleted) }
+            .map { ExerciseRecord(name: $0.exercise.name, sets: $0.setsCompleted, primaryMuscles: $0.exercise.primaryMuscles, secondaryMuscles: $0.exercise.secondaryMuscles) }
 
         StorageService.shared.saveSession(
             routineName: routineName,
@@ -275,6 +292,7 @@ final class WorkoutViewModel {
     }
 
     private func advanceToNext(from idx: Int) {
+        justFinishedIdx = idx
         var nextIdx = idx + 1
         while nextIdx < exercises.count {
             let next = exercises[nextIdx]

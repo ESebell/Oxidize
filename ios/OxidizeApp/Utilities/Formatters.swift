@@ -3,7 +3,7 @@ import Foundation
 func formatTime(_ totalSeconds: Int64) -> String {
     let mins = totalSeconds / 60
     let secs = totalSeconds % 60
-    return String(format: "%d:%02d", mins, secs)
+    return String(format: "%02d:%02d", mins, secs)
 }
 
 func formatDate(_ timestamp: Int64) -> String {

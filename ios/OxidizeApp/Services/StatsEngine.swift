@@ -55,67 +55,61 @@ enum StatsEngine {
 
     // MARK: - Muscle Groups
 
+    /// Maps muscle names to MuscleGroup.
+    /// Handles: Wger Latin names (exerciseinfo), English names, Swedish category names (legacy data)
     static func parseMuscleGroup(_ name: String) -> MuscleGroup? {
-        switch name.lowercased() {
-        case "chest", "bröst", "pectoralis": return .chest
-        case "back", "rygg", "lats", "latissimus": return .back
-        case "shoulders", "axlar", "deltoids", "delts": return .shoulders
-        case "biceps", "bicep": return .biceps
-        case "triceps", "tricep": return .triceps
-        case "quads", "quadriceps", "lår (fram)", "legs": return .quads
-        case "hamstrings", "lår (bak)", "hamstring": return .hamstrings
-        case "glutes", "rumpa", "gluteus", "gluteals": return .glutes
-        case "calves", "vader", "calf": return .calves
-        case "core", "abs", "mage", "abdominals": return .core
-        default: return nil
-        }
-    }
-
-    static func getMuscleGroupsWeighted(_ exerciseName: String) -> [(MuscleGroup, Int)] {
-        switch exerciseName {
-        case "Squats", "Knäböj":
-            return [(.quads, 3), (.glutes, 3), (.core, 1)]
-        case "Bench Press", "Bänkpress":
-            return [(.chest, 3), (.triceps, 1), (.shoulders, 1)]
-        case "Hip Thrusts":
-            return [(.glutes, 3), (.hamstrings, 1)]
-        case "Latsdrag":
-            return [(.back, 3), (.biceps, 1)]
-        case "Leg Curls":
-            return [(.hamstrings, 3)]
-        case "Dips":
-            return [(.chest, 3), (.triceps, 3)]
-        case "Stående vadpress", "Sittande vadpress":
-            return [(.calves, 3)]
-        case "Deadlift", "Marklyft":
-            return [(.back, 3), (.hamstrings, 3), (.glutes, 3), (.core, 1)]
-        case "Shoulder Press", "Militärpress":
-            return [(.shoulders, 3), (.triceps, 1)]
-        case "Sittande rodd":
-            return [(.back, 3), (.biceps, 1)]
-        case "Sidolyft":
-            return [(.shoulders, 3)]
-        case "Facepulls":
-            return [(.shoulders, 3), (.back, 1)]
-        case "Hammercurls":
-            return [(.biceps, 3)]
-        case "Shoulder Taps":
-            return [(.core, 3), (.shoulders, 1)]
-        case "Mountain Climbers":
-            return [(.core, 3), (.quads, 1)]
-        case "Dead Bug":
-            return [(.core, 3)]
-        case "Utfallssteg":
-            return [(.quads, 3), (.glutes, 3)]
+        let n = name.lowercased()
+        switch n {
+        // Chest — Wger: "Pectoralis major" (id 4)
+        case "pectoralis major", "chest", "bröst":
+            return .chest
+        // Back — Wger: "Latissimus dorsi" (id 12), "Trapezius" (id 9), "Serratus anterior" (id 3)
+        // + "Erector spinae" (manual override, not in Wger)
+        case "latissimus dorsi", "trapezius", "serratus anterior", "erector spinae",
+             "back", "lats", "rygg":
+            return .back
+        // Shoulders — Wger: "Anterior deltoid" (id 2)
+        case "anterior deltoid", "posterior deltoid", "lateral deltoid",
+             "shoulders", "deltoids", "delts", "axlar":
+            return .shoulders
+        // Biceps — Wger: "Biceps brachii" (id 1), "Brachialis" (id 13)
+        case "biceps brachii", "brachialis",
+             "biceps", "bicep":
+            return .biceps
+        // Triceps — Wger: "Triceps brachii" (id 5)
+        case "triceps brachii",
+             "triceps", "tricep":
+            return .triceps
+        // Quads — Wger: "Quadriceps femoris" (id 10)
+        case "quadriceps femoris",
+             "quads", "quadriceps", "legs", "ben":
+            return .quads
+        // Hamstrings — Wger: "Biceps femoris" (id 11)
+        case "biceps femoris",
+             "hamstrings", "hamstring":
+            return .hamstrings
+        // Glutes — Wger: "Gluteus maximus" (id 8)
+        case "gluteus maximus", "gluteus medius",
+             "glutes", "gluteals", "rumpa":
+            return .glutes
+        // Calves — Wger: "Gastrocnemius" (id 7), "Soleus" (id 15)
+        case "gastrocnemius", "soleus",
+             "calves", "calf", "vader":
+            return .calves
+        // Core — Wger: "Rectus abdominis" (id 6), "Obliquus externus abdominis" (id 14)
+        case "rectus abdominis", "obliquus externus abdominis",
+             "core", "abs", "abdominals", "obliques", "mage", "magmuskler":
+            return .core
+        // Swedish legacy category names that are too generic — map to most common
+        case "armar":  // "Arms" — could be biceps or triceps, default to biceps
+            return .biceps
         default:
-            return []
+            return nil
         }
     }
 
+    /// Get muscle groups for an Exercise (used in routine builder UI)
     static func getMuscleGroupsForExercise(_ exercise: Exercise) -> [(MuscleGroup, Int)] {
-        let hardcoded = getMuscleGroupsWeighted(exercise.name)
-        if !hardcoded.isEmpty { return hardcoded }
-
         var result: [(MuscleGroup, Int)] = []
         for name in exercise.primaryMuscles {
             if let mg = parseMuscleGroup(name) { result.append((mg, 3)) }
@@ -126,33 +120,51 @@ enum StatsEngine {
         return result
     }
 
+    /// Get muscle groups from a session exercise record (used in stats)
+    static func musclesFromRecord(_ record: ExerciseRecord) -> [(MuscleGroup, Int)] {
+        var result: [(MuscleGroup, Int)] = []
+        for name in record.primaryMuscles {
+            if let mg = parseMuscleGroup(name) { result.append((mg, 3)) }
+        }
+        for name in record.secondaryMuscles {
+            if let mg = parseMuscleGroup(name) { result.append((mg, 1)) }
+        }
+        return result
+    }
+
+    /// Per-muscle weekly sets using exact Wger muscle names (lowercased).
+    /// Primary muscles get full set count, secondary get 1/3.
+    static func calculateWeeklyMuscleDetail(db: Database, days: Int64 = 7) -> [String: Int] {
+        let cutoff = currentTimestamp() - (days * 86400)
+        var sets: [String: Int] = [:]
+        for session in db.sessions where session.timestamp >= cutoff {
+            for exercise in session.exercises {
+                let count = exercise.sets.count
+                if count == 0 { continue }
+                for muscle in exercise.primaryMuscles {
+                    sets[muscle.lowercased(), default: 0] += count
+                }
+                for muscle in exercise.secondaryMuscles {
+                    sets[muscle.lowercased(), default: 0] += max(1, count / 3)
+                }
+            }
+        }
+        return sets
+    }
+
     static func calculateWeeklySets(db: Database, days: Int64 = 7) -> [MuscleGroup: Int] {
         let cutoff = currentTimestamp() - (days * 86400)
         var sets: [MuscleGroup: Int] = [:]
         for muscle in MuscleGroup.allCases { sets[muscle] = 0 }
 
-        let routine = StorageService.shared.loadActiveRoutine()
-        var exerciseLookup: [String: Exercise] = [:]
-        if let routine {
-            for pass in routine.passes {
-                for ex in pass.exercises + pass.finishers {
-                    exerciseLookup[ex.name] = ex
-                }
-            }
-        }
+        let weeklySessions = db.sessions.filter { $0.timestamp >= cutoff }
 
-        for session in db.sessions {
-            if session.timestamp < cutoff { continue }
-
+        for session in weeklySessions {
             for exercise in session.exercises {
                 let setsCompleted = exercise.sets.count
                 if setsCompleted == 0 { continue }
 
-                var muscles = getMuscleGroupsWeighted(exercise.name)
-                if muscles.isEmpty, let ex = exerciseLookup[exercise.name] {
-                    muscles = getMuscleGroupsForExercise(ex)
-                }
-
+                let muscles = musclesFromRecord(exercise)
                 for (muscle, weight) in muscles {
                     if weight >= 3 {
                         sets[muscle, default: 0] += setsCompleted
@@ -160,7 +172,6 @@ enum StatsEngine {
                 }
             }
         }
-
         return sets
     }
 
@@ -203,6 +214,7 @@ enum StatsEngine {
             bodyweight: bodyweight,
             totalSessions: db.sessions.count,
             weeklySets: calculateWeeklySets(db: db),
+            weeklyMuscleDetail: calculateWeeklyMuscleDetail(db: db),
             e1rmByExercise: e1rmByExercise
         )
     }

@@ -133,113 +133,47 @@ impl MuscleGroup {
     }
 }
 
-/// Parse a muscle name string (from Wger API or AI) to MuscleGroup
+/// Maps muscle names to MuscleGroup.
+/// Handles: Wger Latin names (exerciseinfo), English names, Swedish category names (legacy data)
 pub fn parse_muscle_name(name: &str) -> Option<MuscleGroup> {
     match name.to_lowercase().as_str() {
-        "chest" | "bröst" | "pectoralis" => Some(MuscleGroup::Chest),
-        "back" | "rygg" | "lats" | "latissimus" => Some(MuscleGroup::Back),
-        "shoulders" | "axlar" | "deltoids" | "delts" => Some(MuscleGroup::Shoulders),
-        "biceps" | "bicep" => Some(MuscleGroup::Biceps),
-        "triceps" | "tricep" => Some(MuscleGroup::Triceps),
-        "quads" | "quadriceps" | "lår (fram)" | "legs" => Some(MuscleGroup::Quads),
-        "hamstrings" | "lår (bak)" | "hamstring" => Some(MuscleGroup::Hamstrings),
-        "glutes" | "rumpa" | "gluteus" | "gluteals" => Some(MuscleGroup::Glutes),
-        "calves" | "vader" | "calf" => Some(MuscleGroup::Calves),
-        "core" | "abs" | "mage" | "abdominals" => Some(MuscleGroup::Core),
+        // Chest — Wger: "Pectoralis major" (id 4)
+        "pectoralis major" | "chest" | "bröst" => Some(MuscleGroup::Chest),
+        // Back — Wger: "Latissimus dorsi" (id 12), "Trapezius" (id 9), "Serratus anterior" (id 3)
+        "latissimus dorsi" | "trapezius" | "serratus anterior"
+            | "back" | "lats" | "rygg" => Some(MuscleGroup::Back),
+        // Shoulders — Wger: "Anterior deltoid" (id 2)
+        "anterior deltoid" | "posterior deltoid" | "lateral deltoid"
+            | "shoulders" | "deltoids" | "delts" | "axlar" => Some(MuscleGroup::Shoulders),
+        // Biceps — Wger: "Biceps brachii" (id 1), "Brachialis" (id 13)
+        "biceps brachii" | "brachialis"
+            | "biceps" | "bicep" => Some(MuscleGroup::Biceps),
+        // Triceps — Wger: "Triceps brachii" (id 5)
+        "triceps brachii"
+            | "triceps" | "tricep" => Some(MuscleGroup::Triceps),
+        // Quads — Wger: "Quadriceps femoris" (id 10)
+        "quadriceps femoris"
+            | "quads" | "quadriceps" | "legs" | "ben" => Some(MuscleGroup::Quads),
+        // Hamstrings — Wger: "Biceps femoris" (id 11)
+        "biceps femoris"
+            | "hamstrings" | "hamstring" => Some(MuscleGroup::Hamstrings),
+        // Glutes — Wger: "Gluteus maximus" (id 8)
+        "gluteus maximus" | "gluteus medius"
+            | "glutes" | "gluteals" | "rumpa" => Some(MuscleGroup::Glutes),
+        // Calves — Wger: "Gastrocnemius" (id 7), "Soleus" (id 15)
+        "gastrocnemius" | "soleus"
+            | "calves" | "calf" | "vader" => Some(MuscleGroup::Calves),
+        // Core — Wger: "Rectus abdominis" (id 6), "Obliquus externus abdominis" (id 14)
+        "rectus abdominis" | "obliquus externus abdominis"
+            | "core" | "abs" | "abdominals" | "obliques" | "mage" | "magmuskler" => Some(MuscleGroup::Core),
+        // Swedish legacy category names that are too generic
+        "armar" => Some(MuscleGroup::Biceps),  // "Arms" — default to biceps
         _ => None,
     }
 }
 
-/// Map exercises to muscle groups with weights.
-/// Returns Vec<(MuscleGroup, weight)> where:
-/// - Primary muscles (main target) = 3 points
-/// - Secondary muscles (assistance) = 1 point
-/// Hardcoded map for default exercises, empty for unknown.
-pub fn get_muscle_groups_weighted(exercise: &str) -> Vec<(MuscleGroup, u32)> {
-    match exercise {
-        // Pass A
-        "Squats" | "Knäböj" => vec![
-            (MuscleGroup::Quads, 3),
-            (MuscleGroup::Glutes, 3),
-            (MuscleGroup::Core, 1),
-        ],
-        "Bench Press" | "Bänkpress" => vec![
-            (MuscleGroup::Chest, 3),
-            (MuscleGroup::Triceps, 1),
-            (MuscleGroup::Shoulders, 1),
-        ],
-        "Hip Thrusts" => vec![
-            (MuscleGroup::Glutes, 3),
-            (MuscleGroup::Hamstrings, 1),
-        ],
-        "Latsdrag" => vec![
-            (MuscleGroup::Back, 3),
-            (MuscleGroup::Biceps, 1),
-        ],
-        "Leg Curls" => vec![
-            (MuscleGroup::Hamstrings, 3),
-        ],
-        "Dips" => vec![
-            (MuscleGroup::Chest, 3),
-            (MuscleGroup::Triceps, 3),
-        ],
-        "Stående vadpress" | "Sittande vadpress" => vec![
-            (MuscleGroup::Calves, 3),
-        ],
-        // Pass B
-        "Deadlift" | "Marklyft" => vec![
-            (MuscleGroup::Back, 3),
-            (MuscleGroup::Hamstrings, 3),
-            (MuscleGroup::Glutes, 3),
-            (MuscleGroup::Core, 1),
-        ],
-        "Shoulder Press" | "Militärpress" => vec![
-            (MuscleGroup::Shoulders, 3),
-            (MuscleGroup::Triceps, 1),
-        ],
-        "Sittande rodd" => vec![
-            (MuscleGroup::Back, 3),
-            (MuscleGroup::Biceps, 1),
-        ],
-        "Sidolyft" => vec![
-            (MuscleGroup::Shoulders, 3),
-        ],
-        "Facepulls" => vec![
-            (MuscleGroup::Shoulders, 3),
-            (MuscleGroup::Back, 1),
-        ],
-        "Hammercurls" => vec![
-            (MuscleGroup::Biceps, 3),
-        ],
-        // Finishers Pass A
-        "Shoulder Taps" => vec![
-            (MuscleGroup::Core, 3),
-            (MuscleGroup::Shoulders, 1),
-        ],
-        "Mountain Climbers" => vec![
-            (MuscleGroup::Core, 3),
-            (MuscleGroup::Quads, 1),
-        ],
-        // Finishers Pass B
-        "Dead Bug" => vec![
-            (MuscleGroup::Core, 3),
-        ],
-        "Utfallssteg" => vec![
-            (MuscleGroup::Quads, 3),
-            (MuscleGroup::Glutes, 3),
-        ],
-        _ => vec![],
-    }
-}
-
-/// Get muscle groups for an Exercise struct, using its primary_muscles/secondary_muscles
-/// fields as fallback when the exercise name isn't in the hardcoded map.
+/// Get muscle groups for an Exercise struct from its stored muscle data
 pub fn get_muscle_groups_for_exercise(exercise: &crate::types::Exercise) -> Vec<(MuscleGroup, u32)> {
-    let hardcoded = get_muscle_groups_weighted(&exercise.name);
-    if !hardcoded.is_empty() {
-        return hardcoded;
-    }
-    // Fallback: use muscle data from the Exercise struct (Wger API / AI-generated)
     let mut result = Vec::new();
     for name in &exercise.primary_muscles {
         if let Some(mg) = parse_muscle_name(name) {
@@ -247,6 +181,22 @@ pub fn get_muscle_groups_for_exercise(exercise: &crate::types::Exercise) -> Vec<
         }
     }
     for name in &exercise.secondary_muscles {
+        if let Some(mg) = parse_muscle_name(name) {
+            result.push((mg, 1));
+        }
+    }
+    result
+}
+
+/// Get muscle groups from a session exercise record
+pub fn muscles_from_record(record: &ExerciseRecord) -> Vec<(MuscleGroup, u32)> {
+    let mut result = Vec::new();
+    for name in &record.primary_muscles {
+        if let Some(mg) = parse_muscle_name(name) {
+            result.push((mg, 3));
+        }
+    }
+    for name in &record.secondary_muscles {
         if let Some(mg) = parse_muscle_name(name) {
             result.push((mg, 1));
         }
@@ -266,14 +216,6 @@ pub fn calculate_weekly_sets(db: &Database, days: i64) -> HashMap<MuscleGroup, u
         sets.insert(muscle, 0);
     }
 
-    let routine = crate::storage::load_active_routine();
-    let exercise_lookup: HashMap<String, &crate::types::Exercise> = routine.as_ref()
-        .map(|r| r.passes.iter()
-            .flat_map(|p| p.exercises.iter().chain(p.finishers.iter()))
-            .map(|e| (e.name.clone(), e))
-            .collect())
-        .unwrap_or_default();
-
     for session in &db.sessions {
         if session.timestamp < cutoff { continue; }
 
@@ -281,14 +223,7 @@ pub fn calculate_weekly_sets(db: &Database, days: i64) -> HashMap<MuscleGroup, u
             let sets_completed = exercise.sets.len() as u32;
             if sets_completed == 0 { continue; }
 
-            let muscles = get_muscle_groups_weighted(&exercise.name);
-            let muscles = if muscles.is_empty() {
-                exercise_lookup.get(&exercise.name)
-                    .map(|e| get_muscle_groups_for_exercise(e))
-                    .unwrap_or_default()
-            } else {
-                muscles
-            };
+            let muscles = muscles_from_record(exercise);
 
             // Only count primary muscles (weight == 3)
             for (muscle, weight) in muscles {

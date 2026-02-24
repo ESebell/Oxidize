@@ -3,6 +3,29 @@ import Foundation
 struct ExerciseRecord: Codable, Hashable {
     var name: String
     var sets: [SetRecord]
+    var primaryMuscles: [String]
+    var secondaryMuscles: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case name, sets
+        case primaryMuscles = "primary_muscles"
+        case secondaryMuscles = "secondary_muscles"
+    }
+
+    init(name: String, sets: [SetRecord], primaryMuscles: [String] = [], secondaryMuscles: [String] = []) {
+        self.name = name
+        self.sets = sets
+        self.primaryMuscles = primaryMuscles
+        self.secondaryMuscles = secondaryMuscles
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        sets = try c.decode([SetRecord].self, forKey: .sets)
+        primaryMuscles = try c.decodeIfPresent([String].self, forKey: .primaryMuscles) ?? []
+        secondaryMuscles = try c.decodeIfPresent([String].self, forKey: .secondaryMuscles) ?? []
+    }
 }
 
 struct Session: Codable, Identifiable, Hashable {

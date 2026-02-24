@@ -56,11 +56,76 @@ Rules:
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct WgerExercise {
     id: u32,
+    base_id: u32,
     name: String,
     primary_muscles: Vec<String>,
     secondary_muscles: Vec<String>,
     image_url: Option<String>,
     equipment: Option<String>,
+}
+
+// Wger muscle ID → English name mapping
+// Source: https://wger.de/api/v2/muscle/?format=json
+fn wger_muscle_name(id: u32) -> &'static str {
+    match id {
+        1 => "Biceps brachii",
+        2 => "Anterior deltoid",
+        3 => "Serratus anterior",
+        4 => "Pectoralis major",
+        5 => "Obliquus externus abdominis",
+        6 => "Rectus abdominis",
+        7 => "Gastrocnemius",
+        8 => "Gluteus maximus",
+        9 => "Trapezius",
+        10 => "Quadriceps femoris",
+        11 => "Biceps femoris",
+        12 => "Latissimus dorsi",
+        13 => "Brachialis",
+        14 => "Obliquus externus abdominis",
+        15 => "Soleus",
+        _ => "Unknown",
+    }
+}
+
+async fn fetch_wger_muscles(base_id: u32) -> (Vec<String>, Vec<String>) {
+    let window = match web_sys::window() {
+        Some(w) => w,
+        None => return (vec![], vec![]),
+    };
+
+    let url = format!("https://wger.de/api/v2/exerciseinfo/{}/?format=json", base_id);
+    let resp_value = match JsFuture::from(window.fetch_with_str(&url)).await {
+        Ok(v) => v,
+        Err(_) => return (vec![], vec![]),
+    };
+    let resp: Response = match resp_value.dyn_into() {
+        Ok(r) => r,
+        Err(_) => return (vec![], vec![]),
+    };
+    if !resp.ok() { return (vec![], vec![]); }
+
+    let json = match JsFuture::from(match resp.json() { Ok(j) => j, Err(_) => return (vec![], vec![]) }).await {
+        Ok(j) => j,
+        Err(_) => return (vec![], vec![]),
+    };
+
+    #[derive(Deserialize)]
+    struct WgerMuscle { id: u32 }
+    #[derive(Deserialize)]
+    struct WgerExerciseInfo {
+        muscles: Vec<WgerMuscle>,
+        #[serde(default)]
+        muscles_secondary: Vec<WgerMuscle>,
+    }
+
+    let info: WgerExerciseInfo = match serde_wasm_bindgen::from_value(json) {
+        Ok(i) => i,
+        Err(_) => return (vec![], vec![]),
+    };
+
+    let primary: Vec<String> = info.muscles.iter().map(|m| wger_muscle_name(m.id).to_string()).collect();
+    let secondary: Vec<String> = info.muscles_secondary.iter().map(|m| wger_muscle_name(m.id).to_string()).collect();
+    (primary, secondary)
 }
 
 async fn search_wger_exercises(query: &str) -> Result<Vec<WgerExercise>, JsValue> {
@@ -92,14 +157,17 @@ async fn search_wger_exercises(query: &str) -> Result<Vec<WgerExercise>, JsValue
     #[derive(Deserialize)]
     struct WgerSuggestionData {
         id: u32,
+        base_id: u32,
         name: String,
-        category: String,
         image: Option<String>,
     }
 
     let search_resp: WgerSearchResponse = serde_wasm_bindgen::from_value(json).unwrap_or(WgerSearchResponse { suggestions: vec![] });
 
-    let exercises: Vec<WgerExercise> = search_resp.suggestions.into_iter().take(10).map(|s| {
+    let suggestions: Vec<_> = search_resp.suggestions.into_iter().take(10).collect();
+    let mut exercises = Vec::new();
+
+    for s in suggestions {
         let image_url = s.data.image.map(|img| {
             if img.starts_with("http") {
                 img
@@ -108,15 +176,18 @@ async fn search_wger_exercises(query: &str) -> Result<Vec<WgerExercise>, JsValue
             }
         });
 
-        WgerExercise {
+        let (primary_muscles, secondary_muscles) = fetch_wger_muscles(s.data.base_id).await;
+
+        exercises.push(WgerExercise {
             id: s.data.id,
+            base_id: s.data.base_id,
             name: s.data.name,
-            primary_muscles: vec![s.data.category],
-            secondary_muscles: vec![],
+            primary_muscles,
+            secondary_muscles,
             image_url,
             equipment: None,
-        }
-    }).collect();
+        });
+    }
 
     Ok(exercises)
 }
@@ -750,7 +821,7 @@ pub fn RoutineBuilder(
                                                                 ex_clone.secondary_muscles.clone(),
                                                                 ex_clone.image_url.clone(),
                                                                 ex_clone.equipment.clone(),
-                                                                ex_clone.id,
+                                                                ex_clone.base_id,
                                                             );
                                                             if fin {
                                                                 new_ex.is_bodyweight = true;

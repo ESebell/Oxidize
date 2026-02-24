@@ -23,11 +23,11 @@ enum Theme {
     // Status
     static let danger = Color(hex: "#ff4444")
 
-    // Volume colors (weekly volume bars)
+    // Volume colors (shared between heatmap + volume bars)
     static let volNone = Color(hex: "#444444")
-    static let volLow = Color(hex: "#ff6600")
-    static let volOptimal = Color(hex: "#00ff88")
-    static let volHigh = Color(hex: "#ff4444")
+    static let volLow = Color(hex: "#00ccff")      // Cyan — 1-9 sets
+    static let volOptimal = Color(hex: "#00ff88")   // Green — 10-20 sets
+    static let volHigh = Color(hex: "#ff0044")      // Red — 20+ sets
 
     // Progression colors
     static let progressImproved = Color(hex: "#00ff88")

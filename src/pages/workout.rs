@@ -454,6 +454,8 @@ pub fn WorkoutActive(
                                                 .map(|e| ExerciseRecord {
                                                     name: e.exercise.name.clone(),
                                                     sets: e.sets_completed.clone(),
+                                                    primary_muscles: e.exercise.primary_muscles.clone(),
+                                                    secondary_muscles: e.exercise.secondary_muscles.clone(),
                                                 })
                                                 .collect();
                                             storage::save_session(routine_name_sig.get(), records, elapsed.get());

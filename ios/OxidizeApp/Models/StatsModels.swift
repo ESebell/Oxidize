@@ -32,5 +32,6 @@ struct StatsSummary {
     var bodyweight: Double = 0
     var totalSessions: Int = 0
     var weeklySets: [MuscleGroup: Int] = [:]
+    var weeklyMuscleDetail: [String: Int] = [:]
     var e1rmByExercise: [String: Double] = [:]
 }

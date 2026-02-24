@@ -172,6 +172,10 @@ pub struct WorkoutData {
 pub struct ExerciseRecord {
     pub name: String,
     pub sets: Vec<SetRecord>,
+    #[serde(default)]
+    pub primary_muscles: Vec<String>,
+    #[serde(default)]
+    pub secondary_muscles: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
