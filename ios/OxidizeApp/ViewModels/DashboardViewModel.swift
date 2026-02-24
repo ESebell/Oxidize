@@ -40,20 +40,16 @@ final class DashboardViewModel {
         pausedWorkout = StorageService.shared.loadPausedWorkout()
         displayName = StorageService.shared.loadDisplayName() ?? ""
 
-        // Load active routine
-        if let routine = StorageService.shared.loadActiveRoutine() {
+        // Load active routine — always refresh from cloud, fall back to cache
+        if let routine = try? await SupabaseService.shared.getActiveRoutine() {
+            activeRoutine = routine
+            StorageService.shared.saveActiveRoutine(routine)
+        } else if let routine = StorageService.shared.loadActiveRoutine() {
             activeRoutine = routine
         } else {
-            // Try to fetch from cloud
-            if let routine = try? await SupabaseService.shared.getActiveRoutine() {
-                activeRoutine = routine
-                StorageService.shared.saveActiveRoutine(routine)
-            } else {
-                // Use default
-                let defaultRoutine = StorageService.shared.createDefaultRoutine()
-                activeRoutine = defaultRoutine
-                StorageService.shared.saveActiveRoutine(defaultRoutine)
-            }
+            let defaultRoutine = StorageService.shared.createDefaultRoutine()
+            activeRoutine = defaultRoutine
+            StorageService.shared.saveActiveRoutine(defaultRoutine)
         }
 
         isLoading = false
