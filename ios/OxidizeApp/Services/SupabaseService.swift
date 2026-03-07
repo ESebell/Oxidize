@@ -32,6 +32,16 @@ final class SupabaseService {
         return session
     }
 
+    func signInWithApple(idToken: String, nonce: String) async throws -> AuthSession {
+        let session = try await client.auth.signInWithIdToken(
+            credentials: .init(provider: .apple, idToken: idToken, nonce: nonce)
+        )
+        let authSession = authSessionFromSupabase(session)
+        StorageService.shared.saveAuthSession(authSession)
+        StorageService.shared.updateLastActivity()
+        return authSession
+    }
+
     func signOut() async {
         try? await client.auth.signOut()
         StorageService.shared.clearAuthSession()

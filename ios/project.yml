@@ -20,7 +20,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.oxidize.app
         MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: 1
+        CURRENT_PROJECT_VERSION: 2
         SWIFT_STRICT_CONCURRENCY: complete
         DEVELOPMENT_TEAM: "3SX65B95ZS"
         CODE_SIGN_STYLE: Automatic
@@ -38,14 +38,21 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         CFBundleDisplayName: Oxidize
-        NSHealthShareUsageDescription: "Oxidize läser din kroppsvikt från Hälsa för styrkestatistik"
-        NSHealthUpdateUsageDescription: "Oxidize sparar träningspass och kroppsvikt till Hälsa"
+        NSHealthShareUsageDescription: "Oxidize använder din kroppsvikt från Hälsa för att beräkna relativ styrka och spåra viktförändringar över tid."
+        NSHealthUpdateUsageDescription: "Oxidize sparar genomförda styrketräningspass och kroppsviktsmätningar till Hälsa så att all din hälsodata samlas på ett ställe."
     entitlements:
       path: OxidizeApp/OxidizeApp.entitlements
       properties:
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.access: []
+        com.apple.developer.applesignin:
+          - Default
     dependencies:
       - package: Supabase
         product: Supabase
