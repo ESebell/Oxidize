@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OXIDIZE — Privacy Policy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000000;
+            font-family: 'JetBrains Mono', monospace;
+            color: #f5e6b8;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 80px 24px;
+            line-height: 1.7;
+        }
+
+        .container {
+            max-width: 640px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #00ff88;
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            margin-bottom: 48px;
+        }
+
+        h2 {
+            color: #00ff88;
+            font-size: 0.95rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            margin-top: 36px;
+            margin-bottom: 12px;
+        }
+
+        p, li {
+            font-size: 0.85rem;
+            font-weight: 400;
+            margin-bottom: 12px;
+        }
+
+        ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        ul li::before {
+            content: "—  ";
+            color: #00ff88;
+        }
+
+        a {
+            color: #00ff88;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .updated {
+            margin-top: 48px;
+            font-size: 0.75rem;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>OXIDIZE — Privacy Policy</h1>
+
+        <h2>What We Collect</h2>
+        <p>Oxidize collects only the data necessary to provide the workout tracking service:</p>
+        <ul>
+            <li>Email address (for account authentication)</li>
+            <li>Workout sessions (exercises, sets, reps, weights)</li>
+            <li>Body weight measurements</li>
+            <li>Saved routines and user preferences</li>
+        </ul>
+
+        <h2>HealthKit</h2>
+        <p>If you grant permission, Oxidize reads and writes body weight data to Apple Health and logs completed workouts. HealthKit data is never sent to external servers — it stays on your device and in Apple Health.</p>
+
+        <h2>How We Store Your Data</h2>
+        <p>Your data is stored securely in Supabase, a cloud database with row-level security. Each user can only access their own data. Authentication is handled through Supabase Auth.</p>
+
+        <h2>Third Parties</h2>
+        <p>We do not sell, share, or transfer your personal data to third parties. The only external services used are:</p>
+        <ul>
+            <li>Supabase (database and authentication)</li>
+            <li>Google Gemini (AI routine generation — no personal data is sent, only workout preferences)</li>
+        </ul>
+
+        <h2>Data Deletion</h2>
+        <p>You can request full deletion of your account and all associated data by contacting us. Upon request, all data will be permanently removed from our servers.</p>
+
+        <h2>Contact</h2>
+        <p>Questions about this policy? Reach us at <a href="mailto:erik@sebell.se">erik@sebell.se</a></p>
+
+        <p class="updated">Last updated: February 2026</p>
+    </div>
+</body>
+</html>
