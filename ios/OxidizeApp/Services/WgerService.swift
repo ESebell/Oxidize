@@ -8,7 +8,7 @@ enum WgerService {
         2: "Anterior deltoid",
         3: "Serratus anterior",
         4: "Pectoralis major",
-        5: "Obliquus externus abdominis",
+        5: "Triceps brachii",
         6: "Rectus abdominis",
         7: "Gastrocnemius",
         8: "Gluteus maximus",

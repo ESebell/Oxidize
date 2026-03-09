@@ -133,7 +133,7 @@ enum StatsEngine {
     }
 
     /// Per-muscle weekly sets using exact Wger muscle names (lowercased).
-    /// Primary muscles get full set count, secondary get 1/3.
+    /// Primary muscles get full set count, secondary get 1 per exercise.
     static func calculateWeeklyMuscleDetail(db: Database, days: Int64 = 7) -> [String: Int] {
         let cutoff = currentTimestamp() - (days * 86400)
         var sets: [String: Int] = [:]
@@ -145,7 +145,7 @@ enum StatsEngine {
                     sets[muscle.lowercased(), default: 0] += count
                 }
                 for muscle in exercise.secondaryMuscles {
-                    sets[muscle.lowercased(), default: 0] += max(1, count / 3)
+                    sets[muscle.lowercased(), default: 0] += 1
                 }
             }
         }
@@ -168,6 +168,8 @@ enum StatsEngine {
                 for (muscle, weight) in muscles {
                     if weight >= 3 {
                         sets[muscle, default: 0] += setsCompleted
+                    } else {
+                        sets[muscle, default: 0] += 1
                     }
                 }
             }

@@ -51,7 +51,7 @@ final class SyncService {
         // Enrich sessions with proper muscle data from Wger exerciseinfo
         // Force re-enrich if muscle data version is outdated (v2 = exerciseinfo-based)
         let muscleDataVersion = UserDefaults.standard.integer(forKey: "muscle_data_version")
-        let needsFullReenrich = muscleDataVersion < 2
+        let needsFullReenrich = muscleDataVersion < 3
 
         let genericCategories: Set<String> = [
             "Armar", "Ben", "Bröst", "Axlar", "Rygg", "Vader", "Magmuskler",
@@ -111,10 +111,84 @@ final class SyncService {
             try? await SupabaseService.shared.upsertSession(session)
         }
 
+        // Migrate routine muscle data (re-fetch from Wger using wgerId)
+        if needsFullReenrich {
+            await migrateRoutineMuscles()
+        }
+
         if !enriched.isEmpty || needsEnrichment.isEmpty {
-            UserDefaults.standard.set(2, forKey: "muscle_data_version")
+            UserDefaults.standard.set(3, forKey: "muscle_data_version")
         }
 
         print("SYNC COMPLETE: \(db.sessions.count) sessions, enriched \(enriched.count)")
+    }
+
+    /// Re-fetch muscle data for all routine exercises from Wger API
+    private func migrateRoutineMuscles() async {
+        guard let routines = try? await SupabaseService.shared.fetchRoutines(),
+              !routines.isEmpty else { return }
+
+        // Collect all unique wgerIds across all routines
+        var wgerIds: Set<Int> = []
+        for routine in routines {
+            for pass in routine.passes {
+                for ex in pass.exercises + pass.finishers {
+                    if let id = ex.wgerId { wgerIds.insert(id) }
+                }
+            }
+        }
+
+        // Fetch muscles concurrently by wgerId
+        var idLookup: [Int: (primary: [String], secondary: [String])] = [:]
+        await withTaskGroup(of: (Int, [String], [String])?.self) { group in
+            for id in wgerIds {
+                group.addTask {
+                    let raw = await WgerService.fetchMuscles(baseId: id)
+                    if raw.primary.isEmpty { return nil }
+                    return (id, raw.primary, raw.secondary)
+                }
+            }
+            for await result in group {
+                if let (id, primary, secondary) = result {
+                    idLookup[id] = (primary, secondary)
+                }
+            }
+        }
+
+        // Apply to routines and save
+        for var routine in routines {
+            var changed = false
+            for pi in routine.passes.indices {
+                for ei in routine.passes[pi].exercises.indices {
+                    if let wid = routine.passes[pi].exercises[ei].wgerId,
+                       let muscles = idLookup[wid] {
+                        let applied = WgerService.applyOverrides(
+                            name: routine.passes[pi].exercises[ei].name,
+                            primary: muscles.primary, secondary: muscles.secondary)
+                        routine.passes[pi].exercises[ei].primaryMuscles = applied.primary
+                        routine.passes[pi].exercises[ei].secondaryMuscles = applied.secondary
+                        changed = true
+                    }
+                }
+                for ei in routine.passes[pi].finishers.indices {
+                    if let wid = routine.passes[pi].finishers[ei].wgerId,
+                       let muscles = idLookup[wid] {
+                        let applied = WgerService.applyOverrides(
+                            name: routine.passes[pi].finishers[ei].name,
+                            primary: muscles.primary, secondary: muscles.secondary)
+                        routine.passes[pi].finishers[ei].primaryMuscles = applied.primary
+                        routine.passes[pi].finishers[ei].secondaryMuscles = applied.secondary
+                        changed = true
+                    }
+                }
+            }
+            if changed {
+                try? await SupabaseService.shared.saveRoutine(routine)
+                if routine.isActive {
+                    StorageService.shared.saveActiveRoutine(routine)
+                }
+            }
+        }
+        print("ROUTINE MIGRATION: \(idLookup.count) exercises re-enriched")
     }
 }
