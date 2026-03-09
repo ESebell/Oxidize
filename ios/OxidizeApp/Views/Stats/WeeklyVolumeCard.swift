@@ -15,7 +15,7 @@ struct WeeklyVolumeCard: View {
                 let sets = vm.summary.weeklySets[muscle] ?? 0
                 HStack {
                     Text(muscle.displayName.uppercased())
-                        .font(.mono(size: 10))
+                        .font(.mono(size: 11))
                         .foregroundStyle(Theme.fgSecondary)
                         .frame(width: 70, alignment: .leading)
 
@@ -48,7 +48,7 @@ struct WeeklyVolumeCard: View {
                 LegendDot(color: Theme.volOptimal, label: "10-20")
                 LegendDot(color: Theme.volHigh, label: "20+")
             }
-            .font(.mono(size: 10))
+            .font(.mono(size: 11))
             .foregroundStyle(Theme.fgMuted)
             .frame(maxWidth: .infinity)
         }

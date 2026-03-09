@@ -70,7 +70,7 @@ struct PassEditorView: View {
                 .listRowBackground(Theme.bgCard)
             } header: {
                 Text("ÖVNINGAR")
-                    .font(.mono(size: 10, weight: .medium))
+                    .font(.mono(size: 11, weight: .medium))
                     .tracking(2)
                     .foregroundStyle(Theme.fgMuted)
             }
@@ -104,7 +104,7 @@ struct PassEditorView: View {
                 .listRowBackground(Theme.bgCard)
             } header: {
                 Text("FINISHERS")
-                    .font(.mono(size: 10, weight: .medium))
+                    .font(.mono(size: 11, weight: .medium))
                     .tracking(2)
                     .foregroundStyle(Theme.fgMuted)
             }

@@ -29,7 +29,7 @@ struct ProgressionCard: View {
                                 .foregroundStyle(Theme.fgPrimary)
                             Spacer()
                             Text(statusLabel(status).uppercased())
-                                .font(.mono(size: 10, weight: .medium))
+                                .font(.mono(size: 11, weight: .medium))
                                 .foregroundStyle(statusColor(status))
                                 .tracking(1)
                         }

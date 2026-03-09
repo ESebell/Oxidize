@@ -55,7 +55,7 @@ struct BodyweightChartCard: View {
                 AxisMarks { _ in
                     AxisGridLine().foregroundStyle(Theme.border)
                     AxisValueLabel()
-                        .font(.mono(size: 10))
+                        .font(.mono(size: 11))
                         .foregroundStyle(Theme.fgMuted)
                 }
             }
@@ -68,7 +68,7 @@ struct BodyweightChartCard: View {
                     Spacer()
                     Text("MAX: \(formatWeight(maxW)) KG")
                 }
-                .font(.mono(size: 10))
+                .font(.mono(size: 11))
                 .foregroundStyle(Theme.fgMuted)
                 .tracking(1)
             }

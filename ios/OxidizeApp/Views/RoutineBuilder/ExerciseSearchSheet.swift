@@ -53,7 +53,7 @@ struct ExerciseSearchSheet: View {
 
                                     if let equipment = exercise.equipment {
                                         Text(equipment)
-                                            .font(.mono(size: 10))
+                                            .font(.mono(size: 11))
                                             .foregroundStyle(Theme.fgMuted)
                                     }
                                 }

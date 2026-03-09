@@ -32,7 +32,7 @@ struct HealthKitSettingsCard: View {
                         handleAction()
                     } label: {
                         Text(buttonText)
-                            .font(.mono(size: 10, weight: .medium))
+                            .font(.mono(size: 11, weight: .medium))
                             .tracking(1)
                             .foregroundStyle(buttonForeground)
                             .padding(.horizontal, 10)

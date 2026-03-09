@@ -26,7 +26,7 @@ struct SettingsView: View {
                                             .foregroundStyle(Theme.fgPrimary)
                                         if routine.isActive {
                                             Text("AKTIV")
-                                                .font(.mono(size: 9, weight: .bold))
+                                                .font(.mono(size: 11, weight: .bold))
                                                 .tracking(1)
                                                 .padding(.horizontal, 6)
                                                 .padding(.vertical, 2)
@@ -47,7 +47,7 @@ struct SettingsView: View {
                                         Task { await vm.setActiveRoutine(id: routine.id) }
                                     } label: {
                                         Text("AKTIVERA")
-                                            .font(.mono(size: 10, weight: .medium))
+                                            .font(.mono(size: 11, weight: .medium))
                                             .tracking(1)
                                             .foregroundStyle(Theme.accentA)
                                             .padding(.horizontal, 10)

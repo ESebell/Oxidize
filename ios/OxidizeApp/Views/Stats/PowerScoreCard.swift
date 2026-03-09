@@ -36,7 +36,7 @@ struct PowerScoreCard: View {
                             .frame(width: 3)
                         VStack(spacing: 4) {
                             Text(lift.uppercased())
-                                .font(.mono(size: 10))
+                                .font(.mono(size: 11))
                                 .foregroundStyle(Theme.fgSecondary)
                                 .tracking(1)
                             Text(String(format: "%.0f kg", e1rm))

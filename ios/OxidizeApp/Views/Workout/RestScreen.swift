@@ -20,7 +20,7 @@ struct RestScreen: View {
             if let next = vm.currentExercise {
                 VStack(spacing: 8) {
                     Text("NÄSTA")
-                        .font(.mono(size: 10, weight: .medium))
+                        .font(.mono(size: 11, weight: .medium))
                         .foregroundStyle(Theme.fgMuted)
                         .tracking(2)
                     Text(next.exercise.name.uppercased())

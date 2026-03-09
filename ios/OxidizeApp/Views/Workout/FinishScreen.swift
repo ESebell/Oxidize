@@ -31,7 +31,7 @@ struct FinishScreen: View {
                             .font(.mono(size: 18, weight: .bold))
                             .foregroundStyle(Theme.fgPrimary)
                         Text("VOLYM")
-                            .font(.mono(size: 10, weight: .medium))
+                            .font(.mono(size: 11, weight: .medium))
                             .foregroundStyle(Theme.fgMuted)
                             .tracking(2)
                     }
@@ -40,7 +40,7 @@ struct FinishScreen: View {
                             .font(.mono(size: 18, weight: .bold))
                             .foregroundStyle(Theme.fgPrimary)
                         Text("KALORIER")
-                            .font(.mono(size: 10, weight: .medium))
+                            .font(.mono(size: 11, weight: .medium))
                             .foregroundStyle(Theme.fgMuted)
                             .tracking(2)
                     }
@@ -49,7 +49,7 @@ struct FinishScreen: View {
                 // RPE selector (1-10, Apple's effort scale)
                 VStack(spacing: 8) {
                     Text("ANSTRÄNGNING")
-                        .font(.mono(size: 10, weight: .medium))
+                        .font(.mono(size: 11, weight: .medium))
                         .foregroundStyle(Theme.fgMuted)
                         .tracking(2)
 

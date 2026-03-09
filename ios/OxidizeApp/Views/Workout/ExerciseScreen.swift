@@ -97,7 +97,7 @@ struct ExerciseScreen: View {
                             .font(.mono(size: 11, weight: .medium))
                             .tracking(1)
                         Image(systemName: "forward.fill")
-                            .font(.mono(size: 10))
+                            .font(.mono(size: 11))
                     }
                     .foregroundStyle(Theme.fgMuted)
                 }

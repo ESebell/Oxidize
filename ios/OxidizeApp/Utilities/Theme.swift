@@ -10,8 +10,8 @@ enum Theme {
 
     // Foreground
     static let fgPrimary = Color(hex: "#f5f5f5")
-    static let fgSecondary = Color(hex: "#888888")
-    static let fgMuted = Color(hex: "#444444")
+    static let fgSecondary = Color(hex: "#999999")
+    static let fgMuted = Color(hex: "#666666")
 
     // Accents
     static let accentA = Color(hex: "#00ff88")

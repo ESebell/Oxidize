@@ -213,7 +213,7 @@ struct AIWizardSheet: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("SAMMANFATTNING")
-                    .font(.mono(size: 10, weight: .medium))
+                    .font(.mono(size: 11, weight: .medium))
                     .foregroundStyle(Theme.fgMuted)
                     .tracking(2)
                 Text("\(vm.aiPassCount) pass, \(vm.aiFocus), \(vm.aiStyle)")

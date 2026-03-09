@@ -110,7 +110,7 @@ struct BodyHeatMapCard: View {
     private func toggleBtn(_ label: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label)
-                .font(.mono(size: 10, weight: .medium))
+                .font(.mono(size: 11, weight: .medium))
                 .tracking(1)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -127,7 +127,7 @@ struct BodyHeatMapCard: View {
                 .fill(sets == 0 ? outlineColor.opacity(0.3) : heatColor(for: sets))
                 .frame(width: 6, height: 6)
             Text(label)
-                .font(.mono(size: 9))
+                .font(.mono(size: 11))
                 .foregroundStyle(Theme.fgMuted)
         }
     }

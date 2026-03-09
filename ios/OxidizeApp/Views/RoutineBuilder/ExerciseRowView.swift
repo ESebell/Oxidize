@@ -100,7 +100,7 @@ struct ExerciseRowView: View {
                         if let partner = exercise.supersetWith {
                             HStack(spacing: 4) {
                                 Text("⟷ \(partner)")
-                                    .font(.mono(size: 9, weight: .bold))
+                                    .font(.mono(size: 11, weight: .bold))
                                     .foregroundStyle(Theme.accentB)
                                     .lineLimit(1)
 
