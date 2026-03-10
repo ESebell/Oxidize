@@ -48,6 +48,12 @@ final class SupabaseService {
         StorageService.shared.clearLastActivity()
     }
 
+    func deleteAccount() async throws {
+        try await client.rpc("delete_user").execute()
+        StorageService.shared.clearAuthSession()
+        StorageService.shared.clearLastActivity()
+    }
+
     func refreshSession() async throws {
         let response = try await client.auth.refreshSession()
         let session = authSessionFromSupabase(response)

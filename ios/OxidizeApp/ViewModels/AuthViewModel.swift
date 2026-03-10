@@ -86,6 +86,14 @@ final class AuthViewModel {
         password = ""
     }
 
+    func deleteAccount() async throws {
+        try await SupabaseService.shared.deleteAccount()
+        currentSession = nil
+        isAuthenticated = false
+        email = ""
+        password = ""
+    }
+
     // MARK: - Sign in with Apple
 
     func configureAppleSignIn(_ request: ASAuthorizationAppleIDRequest) {

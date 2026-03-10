@@ -4,6 +4,8 @@ struct SettingsView: View {
     @Bindable var authVM: AuthViewModel
     @Binding var path: NavigationPath
     @State private var vm = SettingsViewModel()
+    @State private var showDeleteConfirm = false
+    @State private var isDeletingAccount = false
 
     var body: some View {
         ZStack {
@@ -250,6 +252,24 @@ struct SettingsView: View {
                                             .stroke(Theme.fgMuted, lineWidth: 1)
                                     )
                             }
+
+                            Button {
+                                showDeleteConfirm = true
+                            } label: {
+                                Text(isDeletingAccount ? "RADERAR..." : "RADERA KONTO")
+                                    .font(.mono(size: 12, weight: .medium))
+                                    .tracking(1)
+                                    .foregroundStyle(Theme.danger)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Theme.danger.opacity(0.1))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .stroke(Theme.danger, lineWidth: 1)
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                            }
+                            .disabled(isDeletingAccount)
                         }
                         .padding()
                         .background(Theme.bgCard)
@@ -267,5 +287,17 @@ struct SettingsView: View {
         .navigationTitle("INSTÄLLNINGAR")
         .navigationBarTitleDisplayMode(.inline)
         .task { await vm.loadSettings() }
+        .alert("Radera konto", isPresented: $showDeleteConfirm) {
+            Button("Avbryt", role: .cancel) {}
+            Button("Radera permanent", role: .destructive) {
+                Task {
+                    isDeletingAccount = true
+                    try? await authVM.deleteAccount()
+                    isDeletingAccount = false
+                }
+            }
+        } message: {
+            Text("Ditt konto och all träningsdata raderas permanent. Detta går inte att ångra.")
+        }
     }
 }

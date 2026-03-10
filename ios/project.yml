@@ -20,7 +20,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.oxidize.app
         MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: 4
+        CURRENT_PROJECT_VERSION: 5
         SWIFT_STRICT_CONCURRENCY: complete
         DEVELOPMENT_TEAM: "3SX65B95ZS"
         CODE_SIGN_STYLE: Automatic
