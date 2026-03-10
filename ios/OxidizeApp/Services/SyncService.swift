@@ -48,136 +48,95 @@ final class SyncService {
         db.bodyweight = cloudBodyweight
         db.bodyweightHistory = cloudBwHistory
 
-        // Enrich sessions with proper muscle data from Wger exerciseinfo
-        // Force re-enrich if muscle data version is outdated (v2 = exerciseinfo-based)
+        // One-time migration: enrich exercises missing muscle data
         let muscleDataVersion = UserDefaults.standard.integer(forKey: "muscle_data_version")
-        let needsFullReenrich = muscleDataVersion < 3
-
-        let genericCategories: Set<String> = [
-            "Armar", "Ben", "Bröst", "Axlar", "Rygg", "Vader", "Magmuskler",
-            "Arms", "Legs", "Chest", "Shoulders", "Back", "Calves", "Abs",
-        ]
-        var needsEnrichment: Set<String> = []
-        for session in db.sessions {
-            for rec in session.exercises {
-                if needsFullReenrich {
-                    needsEnrichment.insert(rec.name)
-                } else {
-                    let isGeneric = rec.primaryMuscles.isEmpty ||
-                        rec.primaryMuscles.allSatisfy { genericCategories.contains($0) }
-                    if isGeneric { needsEnrichment.insert(rec.name) }
-                }
-            }
+        if muscleDataVersion < 5 {
+            let enrichedCount = await migrateAllMuscleData(db: &db)
+            StorageService.shared.saveData(db)
+            UserDefaults.standard.set(5, forKey: "muscle_data_version")
+            print("MIGRATION: enriched \(enrichedCount) exercises")
+        } else {
+            StorageService.shared.saveData(db)
         }
 
-        // Fetch muscles from Wger for each unique exercise (search by name → exerciseinfo)
-        var muscleLookup: [String: (primary: [String], secondary: [String])] = [:]
-        if !needsEnrichment.isEmpty {
-            await withTaskGroup(of: (String, [String], [String])?.self) { group in
-                for name in needsEnrichment {
-                    group.addTask {
-                        if let muscles = await WgerService.lookupMuscles(exerciseName: name) {
-                            return (name, muscles.primary, muscles.secondary)
-                        }
-                        return nil
-                    }
-                }
-                for await result in group {
-                    if let (name, primary, secondary) = result {
-                        muscleLookup[name] = (primary, secondary)
-                    }
-                }
-            }
-        }
-
-        // Apply to sessions
-        var enriched: [Session] = []
-        for i in db.sessions.indices {
-            var changed = false
-            for j in db.sessions[i].exercises.indices {
-                let rec = db.sessions[i].exercises[j]
-                if let muscles = muscleLookup[rec.name] {
-                    db.sessions[i].exercises[j].primaryMuscles = muscles.primary
-                    db.sessions[i].exercises[j].secondaryMuscles = muscles.secondary
-                    changed = true
-                }
-            }
-            if changed { enriched.append(db.sessions[i]) }
-        }
-
-        StorageService.shared.saveData(db)
-
-        for session in enriched {
-            try? await SupabaseService.shared.upsertSession(session)
-        }
-
-        // Migrate routine muscle data (re-fetch from Wger using wgerId)
-        if needsFullReenrich {
-            await migrateRoutineMuscles()
-        }
-
-        if !enriched.isEmpty || needsEnrichment.isEmpty {
-            UserDefaults.standard.set(3, forKey: "muscle_data_version")
-        }
-
-        print("SYNC COMPLETE: \(db.sessions.count) sessions, enriched \(enriched.count)")
+        print("SYNC COMPLETE: \(db.sessions.count) sessions")
     }
 
-    /// Re-fetch muscle data for all routine exercises from Wger API
-    private func migrateRoutineMuscles() async {
-        guard let routines = try? await SupabaseService.shared.fetchRoutines(),
-              !routines.isEmpty else { return }
+    /// One-time migration: look up all exercises by exact name in Wger,
+    /// fetch muscles via exerciseinfo ID, and save back to Supabase.
+    private func migrateAllMuscleData(db: inout Database) async -> Int {
+        // Collect all unique exercise names that need enrichment (from sessions + routines)
+        var needsEnrichment: Set<String> = []
 
-        // Collect all unique wgerIds across all routines
-        var wgerIds: Set<Int> = []
+        for session in db.sessions {
+            for rec in session.exercises {
+                if rec.primaryMuscles.isEmpty {
+                    needsEnrichment.insert(rec.name)
+                }
+            }
+        }
+
+        let routines = (try? await SupabaseService.shared.fetchRoutines()) ?? []
         for routine in routines {
             for pass in routine.passes {
                 for ex in pass.exercises + pass.finishers {
-                    if let id = ex.wgerId { wgerIds.insert(id) }
+                    if ex.primaryMuscles.isEmpty {
+                        needsEnrichment.insert(ex.name)
+                    }
                 }
             }
         }
 
-        // Fetch muscles concurrently by wgerId
-        var idLookup: [Int: (primary: [String], secondary: [String])] = [:]
-        await withTaskGroup(of: (Int, [String], [String])?.self) { group in
-            for id in wgerIds {
+        guard !needsEnrichment.isEmpty else { return 0 }
+
+        // Lookup via Wger: exact name → baseId → exerciseinfo
+        var lookup: [String: (baseId: Int, primary: [String], secondary: [String])] = [:]
+        await withTaskGroup(of: (String, Int, [String], [String])?.self) { group in
+            for name in needsEnrichment {
                 group.addTask {
-                    let raw = await WgerService.fetchMuscles(baseId: id)
-                    if raw.primary.isEmpty { return nil }
-                    return (id, raw.primary, raw.secondary)
+                    guard let result = await WgerService.lookupByName(exerciseName: name) else { return nil }
+                    return (name, result.baseId, result.primary, result.secondary)
                 }
             }
             for await result in group {
-                if let (id, primary, secondary) = result {
-                    idLookup[id] = (primary, secondary)
+                if let (name, baseId, primary, secondary) = result {
+                    lookup[name] = (baseId, primary, secondary)
                 }
             }
         }
 
-        // Apply to routines and save
+        // Apply to sessions and save to Supabase
+        for i in db.sessions.indices {
+            var changed = false
+            for j in db.sessions[i].exercises.indices {
+                if let data = lookup[db.sessions[i].exercises[j].name] {
+                    db.sessions[i].exercises[j].primaryMuscles = data.primary
+                    db.sessions[i].exercises[j].secondaryMuscles = data.secondary
+                    changed = true
+                }
+            }
+            if changed {
+                try? await SupabaseService.shared.upsertSession(db.sessions[i])
+            }
+        }
+
+        // Apply to routines and save to Supabase
         for var routine in routines {
             var changed = false
             for pi in routine.passes.indices {
                 for ei in routine.passes[pi].exercises.indices {
-                    if let wid = routine.passes[pi].exercises[ei].wgerId,
-                       let muscles = idLookup[wid] {
-                        let applied = WgerService.applyOverrides(
-                            name: routine.passes[pi].exercises[ei].name,
-                            primary: muscles.primary, secondary: muscles.secondary)
-                        routine.passes[pi].exercises[ei].primaryMuscles = applied.primary
-                        routine.passes[pi].exercises[ei].secondaryMuscles = applied.secondary
+                    if let data = lookup[routine.passes[pi].exercises[ei].name] {
+                        routine.passes[pi].exercises[ei].primaryMuscles = data.primary
+                        routine.passes[pi].exercises[ei].secondaryMuscles = data.secondary
+                        routine.passes[pi].exercises[ei].wgerId = data.baseId
                         changed = true
                     }
                 }
                 for ei in routine.passes[pi].finishers.indices {
-                    if let wid = routine.passes[pi].finishers[ei].wgerId,
-                       let muscles = idLookup[wid] {
-                        let applied = WgerService.applyOverrides(
-                            name: routine.passes[pi].finishers[ei].name,
-                            primary: muscles.primary, secondary: muscles.secondary)
-                        routine.passes[pi].finishers[ei].primaryMuscles = applied.primary
-                        routine.passes[pi].finishers[ei].secondaryMuscles = applied.secondary
+                    if let data = lookup[routine.passes[pi].finishers[ei].name] {
+                        routine.passes[pi].finishers[ei].primaryMuscles = data.primary
+                        routine.passes[pi].finishers[ei].secondaryMuscles = data.secondary
+                        routine.passes[pi].finishers[ei].wgerId = data.baseId
                         changed = true
                     }
                 }
@@ -189,6 +148,12 @@ final class SyncService {
                 }
             }
         }
-        print("ROUTINE MIGRATION: \(idLookup.count) exercises re-enriched")
+
+        let unmatched = needsEnrichment.filter { lookup[$0] == nil }
+        if !unmatched.isEmpty {
+            print("UNMATCHED exercises: \(unmatched.sorted().joined(separator: ", "))")
+        }
+
+        return lookup.count
     }
 }

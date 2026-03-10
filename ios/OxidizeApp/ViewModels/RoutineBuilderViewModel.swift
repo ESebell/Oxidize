@@ -212,9 +212,28 @@ final class RoutineBuilderViewModel {
                 bodyweight: bw
             )
 
+            // Enrich with Wger data (overrides Gemini if match found, keeps Gemini data otherwise)
+            var enrichedPasses = generatedPasses
+            for pi in enrichedPasses.indices {
+                for ei in enrichedPasses[pi].exercises.indices {
+                    if let result = await WgerService.lookupByName(exerciseName: enrichedPasses[pi].exercises[ei].name) {
+                        enrichedPasses[pi].exercises[ei].wgerId = result.baseId
+                        enrichedPasses[pi].exercises[ei].primaryMuscles = result.primary
+                        enrichedPasses[pi].exercises[ei].secondaryMuscles = result.secondary
+                    }
+                }
+                for ei in enrichedPasses[pi].finishers.indices {
+                    if let result = await WgerService.lookupByName(exerciseName: enrichedPasses[pi].finishers[ei].name) {
+                        enrichedPasses[pi].finishers[ei].wgerId = result.baseId
+                        enrichedPasses[pi].finishers[ei].primaryMuscles = result.primary
+                        enrichedPasses[pi].finishers[ei].secondaryMuscles = result.secondary
+                    }
+                }
+            }
+
             routineName = name
             routineFocus = focus
-            passes = generatedPasses
+            passes = enrichedPasses
             showAIWizard = false
         } catch {
             print("[AI Wizard] Error: \(error)")

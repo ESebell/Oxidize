@@ -102,24 +102,33 @@ enum WgerService {
         }
     }
 
-    /// Search for an exercise by name and return its muscles (single exerciseinfo call)
-    /// Used for enrichment — lightweight alternative to searchExercises
-    static func lookupMuscles(exerciseName: String) async -> (primary: [String], secondary: [String])? {
+    // Name aliases for exercises whose local name differs from Wger's name
+    private static let nameAliases: [String: String] = [
+        "hammercurls": "Hammer Curls",
+    ]
+
+    /// Search for an exercise by exact name and return its muscles + baseId.
+    /// Only accepts exact name match (case-insensitive) — never falls back to partial matches.
+    static func lookupByName(exerciseName: String) async -> (baseId: Int, primary: [String], secondary: [String])? {
         guard !exerciseName.isEmpty else { return nil }
-        let encoded = exerciseName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? exerciseName
+
+        // Check alias first
+        let searchName = nameAliases[exerciseName.lowercased()] ?? exerciseName
+        let encoded = searchName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? searchName
         let url = URL(string: "https://wger.de/api/v2/exercise/search/?language=2&term=\(encoded)")!
 
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             let response = try JSONDecoder().decode(WgerSearchResponse.self, from: data)
 
-            // Find exact name match, or fall back to first result
-            guard let match = response.suggestions.first(where: { $0.data.name == exerciseName })
-                    ?? response.suggestions.first else { return nil }
+            // Exact name match only (case-insensitive)
+            guard let match = response.suggestions.first(where: {
+                $0.data.name.lowercased() == searchName.lowercased()
+            }) else { return nil }
 
             let raw = await fetchMuscles(baseId: match.data.baseId)
             let (primary, secondary) = applyOverrides(name: match.data.name, primary: raw.primary, secondary: raw.secondary)
-            return primary.isEmpty ? nil : (primary, secondary)
+            return primary.isEmpty ? nil : (match.data.baseId, primary, secondary)
         } catch {
             return nil
         }

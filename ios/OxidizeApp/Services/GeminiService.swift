@@ -11,10 +11,10 @@ enum GeminiService {
           "name": "Pass A",
           "description": "Kort beskrivning",
           "exercises": [
-            {"name": "Exercise Name", "sets": 3, "reps_target": "8-12", "is_superset": false, "is_bodyweight": false}
+            {"name": "Exercise Name", "sets": 3, "reps_target": "8-12", "is_superset": false, "is_bodyweight": false, "primary_muscles": ["Pectoralis major"], "secondary_muscles": ["Triceps brachii", "Anterior deltoid"]}
           ],
           "finishers": [
-            {"name": "Finisher Name", "sets": 3, "reps_target": "15", "is_superset": false, "is_bodyweight": true}
+            {"name": "Finisher Name", "sets": 3, "reps_target": "15", "is_superset": false, "is_bodyweight": true, "primary_muscles": ["Rectus abdominis"], "secondary_muscles": []}
           ]
         }
       ]
@@ -22,12 +22,13 @@ enum GeminiService {
 
     REGLER:
     - Passnamn: Max 8 tecken (t.ex. "Pass A", "Rygg", "Ben")
-    - Övningsnamn på engelska
+    - Övningsnamn på engelska — använd etablerade namn som finns i övningsdatabaser (t.ex. "Bench Press", "Squat", "Deadlift")
     - reps_target: "5-8", "10-12", "AMRAP", eller "30 sek" för tidsstyrda
     - Supersets: Sätt is_superset=true och superset_with="partnerns namn" på BÅDA övningarna
     - superset_name: Kort namn för supersetet (t.ex. "Armar", "Press/Pull")
     - Finishers: Alltid is_bodyweight=true, vanligtvis core/cardio
     - duration_secs: Sätt t.ex. 30 för tidsstyrda övningar (hopprep, mountain climbers etc)
+    - primary_muscles och secondary_muscles: OBLIGATORISKT för varje övning. Använd dessa muskelnamn: Biceps brachii, Anterior deltoid, Serratus anterior, Pectoralis major, Triceps brachii, Rectus abdominis, Gastrocnemius, Gluteus maximus, Trapezius, Quadriceps femoris, Biceps femoris, Latissimus dorsi, Brachialis, Obliquus externus abdominis, Soleus, Erector spinae
     - Svara BARA med JSON, ingen annan text
     """
 
