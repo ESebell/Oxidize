@@ -25,18 +25,69 @@ enum WgerService {
         muscleNames[id] ?? "Unknown"
     }
 
-    // Wger saknar erector spinae — override för övningar som tränar nedre ryggen
-    private static let muscleOverrides: [String: (primary: [String], secondary: [String])] = [
+    // Erector spinae overrides — Wger saknar denna muskel helt (inte i deras muskel-DB)
+    // Namnvarianter från Wger-sökresultat inkluderade.
+    private static let erectorSpinaeExercises: [String: (primary: [String], secondary: [String])] = [
+        // Deadlifts (Wger: baseId 184 "Deadlifts")
+        "deadlifts": (["Erector spinae", "Gluteus maximus"], ["Biceps femoris", "Quadriceps femoris"]),
+        "deadlift": (["Erector spinae", "Gluteus maximus"], ["Biceps femoris", "Quadriceps femoris"]),
+        // Romanian Deadlift (Wger: baseId 507, 1750, 1652, 1700)
+        "romanian deadlift": (["Erector spinae", "Biceps femoris"], ["Gluteus maximus"]),
+        "barbell romanian deadlift (rdl)": (["Erector spinae", "Biceps femoris"], ["Gluteus maximus"]),
+        "dumbbell romanian deadlift": (["Erector spinae", "Biceps femoris"], ["Gluteus maximus"]),
+        "dumbbell romanian deadlifts": (["Erector spinae", "Biceps femoris"], ["Gluteus maximus"]),
+        "romanian deadlift, single leg": (["Erector spinae", "Biceps femoris"], ["Gluteus maximus"]),
+        "single leg rdl": (["Erector spinae", "Biceps femoris"], ["Gluteus maximus"]),
+        // Hyperextensions (Wger: baseId 301, 1809, 1348, 1143)
         "hyperextensions": (["Erector spinae"], ["Gluteus maximus", "Biceps femoris"]),
-        "back extension": (["Erector spinae"], ["Gluteus maximus"]),
+        "reverse hyperextension": (["Erector spinae"], ["Gluteus maximus", "Biceps femoris"]),
         "lower back extensions": (["Erector spinae"], []),
-        "good mornings": (["Erector spinae", "Biceps femoris"], ["Gluteus maximus"]),
-        "good morning": (["Erector spinae", "Biceps femoris"], ["Gluteus maximus"]),
+        "back extensión": (["Erector spinae"], ["Gluteus maximus"]),
     ]
 
-    /// Apply overrides for exercises Wger maps incorrectly
+    /// Supplement erector spinae for exercises where Wger lacks this muscle.
+    /// Only replaces data for known erector spinae exercises; trusts Wger otherwise.
+    static func supplementErectorSpinae(name: String, primary: [String], secondary: [String]) -> (primary: [String], secondary: [String]) {
+        if let override = erectorSpinaeExercises[name.lowercased()] {
+            return override
+        }
+        return (primary, secondary)
+    }
+
+    // Name-based fallback overrides — för övningar utan wgerId
+    // Täcker: övningar som inte finns i Wger, svenska namn, och övningar
+    // vars Wger-namn inte matchar exakt vid sökning
+    private static let nameOverrides: [String: (primary: [String], secondary: [String])] = [
+        // Övningar som inte finns i Wger
+        "mountain climbers": (["Rectus abdominis"], ["Quadriceps femoris", "Anterior deltoid"]),
+        "dead bug": (["Rectus abdominis"], ["Obliquus externus abdominis"]),
+        "shoulder taps": (["Rectus abdominis"], ["Anterior deltoid", "Obliquus externus abdominis"]),
+        // Övningar vars Wger-namn inte matchar vid sökning
+        "facepulls": (["Trapezius"], ["Anterior deltoid"]),
+        "face pulls": (["Trapezius"], ["Anterior deltoid"]),
+        "hip thrusts": (["Gluteus maximus"], ["Biceps femoris"]),
+        "hip thrust": (["Gluteus maximus"], ["Biceps femoris"]),
+        "squats": (["Quadriceps femoris", "Gluteus maximus"], ["Biceps femoris"]),
+        "lunges": (["Quadriceps femoris", "Gluteus maximus"], ["Biceps femoris"]),
+        "seated cable row": (["Latissimus dorsi", "Trapezius"], ["Biceps brachii"]),
+        "shoulder press": (["Anterior deltoid"], ["Triceps brachii"]),
+        // Svenska övningsnamn
+        "latsdrag": (["Latissimus dorsi"], ["Biceps brachii"]),
+        "sidolyft": (["Anterior deltoid"], []),
+        "sittande rodd": (["Latissimus dorsi", "Trapezius"], ["Biceps brachii"]),
+        "sittande vadpress": (["Soleus"], ["Gastrocnemius"]),
+        "stående vadpress": (["Gastrocnemius"], ["Soleus"]),
+        "utfallssteg": (["Quadriceps femoris", "Gluteus maximus"], ["Biceps femoris"]),
+    ]
+
+    /// Apply name-based overrides — only used in fallback path (no wgerId available)
     static func applyOverrides(name: String, primary: [String], secondary: [String]) -> (primary: [String], secondary: [String]) {
-        if let override = muscleOverrides[name.lowercased()] {
+        // Check erector spinae first
+        if let override = erectorSpinaeExercises[name.lowercased()] {
+            return override
+        }
+        // Then name overrides
+        if let override = nameOverrides[name.lowercased()] {
             return override
         }
         return (primary, secondary)
@@ -105,12 +156,26 @@ enum WgerService {
     // Name aliases for exercises whose local name differs from Wger's name
     private static let nameAliases: [String: String] = [
         "hammercurls": "Hammer Curls",
+        "squats": "Barbell Squat",
+        "deadlift": "Deadlift, Barbell",
+        "lunges": "Lunges",
+        "leg curls": "Leg Curl",
+        "seated cable row": "Seated Row",
     ]
 
     /// Search for an exercise by exact name and return its muscles + baseId.
     /// Only accepts exact name match (case-insensitive) — never falls back to partial matches.
     static func lookupByName(exerciseName: String) async -> (baseId: Int, primary: [String], secondary: [String])? {
         guard !exerciseName.isEmpty else { return nil }
+
+        // Check name overrides first (exercises not in Wger, Swedish names, etc.)
+        if let override = nameOverrides[exerciseName.lowercased()] {
+            return (0, override.primary, override.secondary)
+        }
+        // Check erector spinae overrides (Wger lacks this muscle)
+        if let override = erectorSpinaeExercises[exerciseName.lowercased()] {
+            return (0, override.primary, override.secondary)
+        }
 
         // Check alias first
         let searchName = nameAliases[exerciseName.lowercased()] ?? exerciseName
