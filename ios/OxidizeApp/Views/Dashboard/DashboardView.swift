@@ -78,6 +78,17 @@ struct DashboardView: View {
                             }
                         }
                         .padding(.horizontal)
+                    } else if !vm.isLoading {
+                        VStack(spacing: 8) {
+                            Text("INGEN AKTIV RUTIN")
+                                .font(.mono(size: 14, weight: .bold))
+                                .foregroundStyle(Theme.fgMuted)
+                                .tracking(2)
+                            Text("Skapa en rutin i inställningar")
+                                .font(.mono(size: 12))
+                                .foregroundStyle(Theme.fgMuted)
+                        }
+                        .padding(.vertical, 20)
                     }
 
                     Spacer().frame(height: 8)

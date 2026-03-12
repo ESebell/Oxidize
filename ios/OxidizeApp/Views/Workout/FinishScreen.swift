@@ -79,8 +79,8 @@ struct FinishScreen: View {
                         .tint(Theme.accentA)
                 } else {
                     Button {
-                        vm.saveWorkout()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        Task {
+                            await vm.saveWorkout()
                             if !vm.showSyncWarning {
                                 path.removeLast()
                             }

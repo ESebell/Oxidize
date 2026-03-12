@@ -47,9 +47,7 @@ final class DashboardViewModel {
         } else if let routine = StorageService.shared.loadActiveRoutine() {
             activeRoutine = routine
         } else {
-            let defaultRoutine = StorageService.shared.createDefaultRoutine()
-            activeRoutine = defaultRoutine
-            StorageService.shared.saveActiveRoutine(defaultRoutine)
+            activeRoutine = nil
         }
 
         isLoading = false

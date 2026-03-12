@@ -162,7 +162,7 @@ final class StorageService {
 
     func getWorkout(passName: String) -> WorkoutData? {
         let db = loadData()
-        let savedRoutine = loadActiveRoutine() ?? createDefaultRoutine()
+        guard let savedRoutine = loadActiveRoutine() else { return nil }
 
         guard let pass = savedRoutine.passes.first(where: { $0.name == passName }) else {
             return nil
@@ -197,7 +197,7 @@ final class StorageService {
         return WorkoutData(routine: routine, exercises: exercises)
     }
 
-    func saveSession(routineName: String, exercises: [ExerciseRecord], durationSecs: Int64) {
+    func saveSession(routineName: String, exercises: [ExerciseRecord], durationSecs: Int64) async {
         var db = loadData()
 
         let totalVolume = exercises.flatMap(\.sets).reduce(0.0) { $0 + $1.weight * Double($1.reps) }
@@ -211,72 +211,20 @@ final class StorageService {
             totalVolume: totalVolume
         )
 
-        // Save last weights + session to cloud (fire-and-forget)
-        Task {
-            for ex in session.exercises {
-                if let lastSet = ex.sets.last {
-                    await SupabaseService.shared.saveWeightToCloud(
-                        exerciseName: ex.name, weight: lastSet.weight, reps: lastSet.reps
-                    )
-                }
-            }
-            StorageService.shared.updateLastActivity()
-            await SupabaseService.shared.saveSessionToCloud(session)
-        }
-
         // Save locally immediately
         db.addSession(session)
         saveData(db)
+
+        // Push to cloud and wait for completion
+        for ex in session.exercises {
+            if let lastSet = ex.sets.last {
+                await SupabaseService.shared.saveWeightToCloud(
+                    exerciseName: ex.name, weight: lastSet.weight, reps: lastSet.reps
+                )
+            }
+        }
+        updateLastActivity()
+        await SupabaseService.shared.saveSessionToCloud(session)
     }
 
-    // MARK: - Default Routine
-
-    func createDefaultRoutine() -> SavedRoutine {
-        let passA = Pass(
-            name: "Pass A",
-            description: "Ben · Press · Triceps",
-            exercises: [
-                .standard("Squats", sets: 3, reps: "5-8"),
-                .standard("Bench Press", sets: 3, reps: "5-8"),
-                .standard("Hip Thrusts", sets: 3, reps: "8-12"),
-                .standard("Latsdrag", sets: 3, reps: "8-10"),
-                .superset("Leg Curls", sets: 2, reps: "12-15", partner: "Dips", ssName: "Ben/Triceps"),
-                .superset("Dips", sets: 2, reps: "AMRAP", partner: "Leg Curls", ssName: "Ben/Triceps"),
-                .standard("Stående vadpress", sets: 3, reps: "12-15"),
-            ],
-            finishers: [
-                .finisher("Shoulder Taps", sets: 3, reps: "20"),
-                .timedFinisher("Mountain Climbers", sets: 3, duration: 30),
-            ]
-        )
-
-        let passB = Pass(
-            name: "Pass B",
-            description: "Rygg · Axlar · Biceps",
-            exercises: [
-                .standard("Deadlift", sets: 3, reps: "5"),
-                .standard("Shoulder Press", sets: 3, reps: "8-10"),
-                .standard("Sittande rodd", sets: 3, reps: "10-12"),
-                .superset("Sidolyft", sets: 3, reps: "12-15", partner: "Hammercurls", ssName: "Axlar/Armar"),
-                .superset("Hammercurls", sets: 3, reps: "10-12", partner: "Sidolyft", ssName: "Axlar/Armar"),
-                .superset("Facepulls", sets: 3, reps: "15", partner: "Sittande vadpress", ssName: "Rygg/Vader"),
-                .superset("Sittande vadpress", sets: 3, reps: "15-20", partner: "Facepulls", ssName: "Rygg/Vader"),
-            ],
-            finishers: [
-                .finisher("Dead Bug", sets: 3, reps: "12"),
-                .finisher("Utfallssteg", sets: 3, reps: "20"),
-            ]
-        )
-
-        let now = currentTimestamp()
-        return SavedRoutine(
-            id: "default_\(now)",
-            userId: nil,
-            name: "Överkropp/Underkropp",
-            focus: "Styrka & Hypertrofi",
-            passes: [passA, passB],
-            isActive: true,
-            createdAt: now
-        )
-    }
 }

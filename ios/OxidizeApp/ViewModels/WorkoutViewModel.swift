@@ -216,7 +216,7 @@ final class WorkoutViewModel {
         cleanup()
     }
 
-    func saveWorkout() {
+    func saveWorkout() async {
         isSaving = true
         StorageService.shared.clearSyncFailed()
 
@@ -224,28 +224,18 @@ final class WorkoutViewModel {
             .filter { !$0.setsCompleted.isEmpty }
             .map { ExerciseRecord(name: $0.exercise.name, sets: $0.setsCompleted, primaryMuscles: $0.exercise.primaryMuscles, secondaryMuscles: $0.exercise.secondaryMuscles) }
 
-        StorageService.shared.saveSession(
+        // Save session and push to cloud (awaited)
+        await StorageService.shared.saveSession(
             routineName: routineName,
             exercises: records,
             durationSecs: elapsed
         )
 
-        // Poll for sync failure
-        var checkCount = 0
-        Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] timer in
-            checkCount += 1
-
-            if StorageService.shared.getSyncFailedSession() != nil {
-                self?.isSaving = false
-                self?.showSyncWarning = true
-                timer.invalidate()
-                return
-            }
-
-            if checkCount >= 10 {
-                self?.isSaving = false
-                timer.invalidate()
-            }
+        // Check if sync failed
+        if StorageService.shared.getSyncFailedSession() != nil {
+            isSaving = false
+            showSyncWarning = true
+            return
         }
 
         // Save to HealthKit
@@ -254,16 +244,15 @@ final class WorkoutViewModel {
         let cal = Double(finishStats.calories)
         let rpe = selectedRPE
         let name = routineName
-        Task {
-            await HealthKitService.shared.saveWorkout(
-                name: name,
-                start: startDate,
-                end: endDate,
-                calories: cal,
-                rpe: rpe
-            )
-        }
+        await HealthKitService.shared.saveWorkout(
+            name: name,
+            start: startDate,
+            end: endDate,
+            calories: cal,
+            rpe: rpe
+        )
 
+        isSaving = false
         cleanup()
     }
 
