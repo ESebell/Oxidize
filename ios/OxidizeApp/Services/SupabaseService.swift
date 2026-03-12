@@ -1,6 +1,7 @@
 import Foundation
 import Supabase
 
+@MainActor
 @Observable
 final class SupabaseService {
     static let shared = SupabaseService()
@@ -149,17 +150,6 @@ final class SupabaseService {
         guard let userId = currentUserId else { throw OxidizeError.notLoggedIn }
 
         let exercisesJson = try JSONEncoder().encode(session.exercises)
-        let exercisesString = String(data: exercisesJson, encoding: .utf8) ?? "[]"
-
-        let row = SessionRow(
-            id: session.id,
-            routine: session.routine,
-            timestamp: session.timestamp,
-            durationSecs: session.durationSecs,
-            totalVolume: session.totalVolume,
-            exercises: exercisesString,
-            userId: userId
-        )
 
         var request = URLRequest(url: URL(string: "\(SupabaseConfig.url)/rest/v1/sessions")!)
         request.httpMethod = "POST"

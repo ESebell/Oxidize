@@ -43,12 +43,6 @@ final class HealthKitService: Sendable {
         guard isAvailable else { return nil }
 
         let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
-        let query = HKSampleQuery(
-            sampleType: bodyMassType,
-            predicate: nil,
-            limit: 1,
-            sortDescriptors: [sortDescriptor]
-        ) { _, _, _ in }
 
         return await withCheckedContinuation { continuation in
             let query = HKSampleQuery(
@@ -97,28 +91,32 @@ final class HealthKitService: Sendable {
     ) async {
         guard isAvailable else { return }
 
-        let energyBurned = HKQuantity(unit: .kilocalorie(), doubleValue: calories)
-
         var metadata: [String: Any] = [
             HKMetadataKeyWorkoutBrandName: "Oxidize"
         ]
         if let rpe {
-            // Apple's effort score: integer value
             metadata["HKMetadataKeyWorkoutEffortScore"] = rpe
         }
 
-        let workout = HKWorkout(
-            activityType: .traditionalStrengthTraining,
-            start: start,
-            end: end,
-            duration: end.timeIntervalSince(start),
-            totalEnergyBurned: energyBurned,
-            totalDistance: nil,
-            metadata: metadata
-        )
+        let config = HKWorkoutConfiguration()
+        config.activityType = .traditionalStrengthTraining
+
+        let builder = HKWorkoutBuilder(healthStore: store, configuration: config, device: nil)
 
         do {
-            try await store.save(workout)
+            try await builder.beginCollection(at: start)
+
+            let energySample = HKQuantitySample(
+                type: activeEnergyType,
+                quantity: HKQuantity(unit: .kilocalorie(), doubleValue: calories),
+                start: start,
+                end: end
+            )
+            try await builder.addSamples([energySample])
+
+            try await builder.endCollection(at: end)
+            try await builder.addMetadata(metadata)
+            try await builder.finishWorkout()
         } catch {
             print("[HealthKit] Save workout failed: \(error)")
         }

@@ -2,6 +2,7 @@ import Foundation
 import AuthenticationServices
 import CryptoKit
 
+@MainActor
 @Observable
 final class AuthViewModel {
     var email = ""

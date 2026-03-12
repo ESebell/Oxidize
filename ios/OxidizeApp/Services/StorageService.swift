@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 @Observable
 final class StorageService {
     static let shared = StorageService()

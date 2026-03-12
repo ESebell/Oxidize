@@ -82,7 +82,7 @@ enum GeminiService {
         // Validate and clean superset integrity
         let cleanedPasses = routine.passes.map { pass -> Pass in
             var exercises = pass.exercises
-            var finishers = pass.finishers
+            let finishers = pass.finishers
 
             // Remove broken supersets
             for i in exercises.indices {

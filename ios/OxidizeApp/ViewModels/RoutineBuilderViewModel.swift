@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 @Observable
 final class RoutineBuilderViewModel {
     var routineId: String?
@@ -125,7 +126,6 @@ final class RoutineBuilderViewModel {
     }
 
     func unlinkSuperset(exerciseIdx: Int) {
-        let name = passes[selectedPassIdx].exercises[exerciseIdx].name
         let partnerName = passes[selectedPassIdx].exercises[exerciseIdx].supersetWith
 
         passes[selectedPassIdx].exercises[exerciseIdx].isSuperset = false

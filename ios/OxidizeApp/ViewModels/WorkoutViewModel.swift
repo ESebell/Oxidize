@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 
+@MainActor
 @Observable
 final class WorkoutViewModel {
     // State
@@ -67,25 +68,29 @@ final class WorkoutViewModel {
     func startTimer() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            let now = currentTimestamp()
-            self.elapsed = now - self.startTime
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let now = currentTimestamp()
+                self.elapsed = now - self.startTime
 
-            if self.isResting && self.lastSetTime > 0 {
-                self.restElapsed = now - self.lastSetTime
-            }
+                if self.isResting && self.lastSetTime > 0 {
+                    self.restElapsed = now - self.lastSetTime
+                }
 
-            if self.timerRunning {
-                self.timerRemaining -= 1
-                if self.timerRemaining <= 0 {
-                    self.timerRemaining = 0
-                    self.timerRunning = false
-                    self.showTimerFlash = true
-                    HapticService.timerDone()
+                if self.timerRunning {
+                    self.timerRemaining -= 1
+                    if self.timerRemaining <= 0 {
+                        self.timerRemaining = 0
+                        self.timerRunning = false
+                        self.showTimerFlash = true
+                        HapticService.timerDone()
 
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
-                        self?.showTimerFlash = false
-                        self?.completeTimedSet()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                            MainActor.assumeIsolated {
+                                self?.showTimerFlash = false
+                                self?.completeTimedSet()
+                            }
+                        }
                     }
                 }
             }
