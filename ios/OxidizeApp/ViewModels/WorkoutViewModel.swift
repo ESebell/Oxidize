@@ -197,6 +197,34 @@ final class WorkoutViewModel {
         showOverview = false
     }
 
+    func updateSet(exerciseIdx: Int, setIdx: Int, weight: Double, reps: Int) {
+        guard exerciseIdx < exercises.count,
+              setIdx < exercises[exerciseIdx].setsCompleted.count else { return }
+        exercises[exerciseIdx].setsCompleted[setIdx].weight = weight
+        exercises[exerciseIdx].setsCompleted[setIdx].reps = reps
+    }
+
+    func deleteSet(exerciseIdx: Int, setIdx: Int) {
+        guard exerciseIdx < exercises.count,
+              setIdx < exercises[exerciseIdx].setsCompleted.count else { return }
+        exercises[exerciseIdx].setsCompleted.remove(at: setIdx)
+    }
+
+    func addSet(exerciseIdx: Int) {
+        guard exerciseIdx < exercises.count else { return }
+        let ex = exercises[exerciseIdx]
+        let lastSet = ex.setsCompleted.last
+        let weight = lastSet?.weight ?? ex.currentWeight
+        let reps = lastSet?.reps ?? parseTargetReps(ex.exercise.repsTarget)
+        exercises[exerciseIdx].setsCompleted.append(SetRecord(
+            weight: weight,
+            reps: reps,
+            timestamp: currentTimestamp(),
+            restBeforeSecs: nil
+        ))
+        exercises[exerciseIdx].exercise.sets += 1
+    }
+
     // MARK: - Pause / Cancel / Save
 
     func pauseAndExit() {
