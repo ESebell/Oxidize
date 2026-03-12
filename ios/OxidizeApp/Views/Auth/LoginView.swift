@@ -77,11 +77,29 @@ struct LoginView: View {
                         .disabled(authVM.isLoading)
                         .opacity(authVM.isLoading ? 0.5 : 1)
 
-                        Button("Skapa konto") {
-                            showRegister = true
+                        HStack(spacing: 16) {
+                            Button("Skapa konto") {
+                                showRegister = true
+                            }
+                            .font(.mono(size: 14))
+                            .foregroundStyle(Theme.accentA)
+
+                            Text("·")
+                                .foregroundStyle(Theme.fgMuted)
+
+                            Button("Glömt lösenord?") {
+                                Task { await authVM.resetPassword() }
+                            }
+                            .font(.mono(size: 14))
+                            .foregroundStyle(Theme.fgMuted)
                         }
-                        .font(.mono(size: 14))
-                        .foregroundStyle(Theme.accentA)
+
+                        if authVM.resetSent {
+                            Text("Återställningslänk skickad till din e-post")
+                                .font(.mono(size: 13))
+                                .foregroundStyle(Theme.accentA)
+                                .padding(.horizontal, 32)
+                        }
 
                         dividerRow
 

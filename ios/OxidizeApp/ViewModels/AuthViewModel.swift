@@ -79,6 +79,27 @@ final class AuthViewModel {
         isLoading = false
     }
 
+    func resetPassword() async {
+        guard !email.isEmpty else {
+            errorMessage = "Fyll i din e-postadress först"
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            try await SupabaseService.shared.client.auth.resetPasswordForEmail(email)
+            resetSent = true
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoading = false
+    }
+
+    var resetSent = false
+
     func logout() async {
         await SupabaseService.shared.signOut()
         currentSession = nil
