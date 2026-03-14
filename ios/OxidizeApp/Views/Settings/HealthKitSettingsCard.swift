@@ -1,8 +1,7 @@
 import SwiftUI
-import HealthKit
 
 struct HealthKitSettingsCard: View {
-    @State private var status: HKAuthorizationStatus = .notDetermined
+    @State private var status: HealthKitService.HealthStatus = .notDetermined
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -57,7 +56,7 @@ struct HealthKitSettingsCard: View {
     }
 
     private func refreshStatus() {
-        status = HealthKitService.shared.authorizationStatus()
+        status = HealthKitService.shared.healthStatus()
     }
 
     private func handleAction() {
@@ -67,49 +66,44 @@ struct HealthKitSettingsCard: View {
                 await HealthKitService.shared.requestAuthorization()
                 refreshStatus()
             }
-        case .sharingDenied, .sharingAuthorized:
-            // Open system Settings → Health → Oxidize
+        case .denied, .partiallyAuthorized, .authorized:
             if let url = URL(string: UIApplication.openSettingsURLString) {
                 UIApplication.shared.open(url)
             }
-        @unknown default:
-            break
         }
     }
 
     private var statusColor: Color {
         switch status {
-        case .sharingAuthorized: Theme.accentA
-        case .sharingDenied: Theme.danger
+        case .authorized: Theme.accentA
+        case .partiallyAuthorized: Theme.accentB
+        case .denied: Theme.danger
         case .notDetermined: Theme.fgMuted
-        @unknown default: Theme.fgMuted
         }
     }
 
     private var statusText: String {
         switch status {
-        case .sharingAuthorized: "Ansluten"
-        case .sharingDenied: "Nekad"
+        case .authorized: "Ansluten"
+        case .partiallyAuthorized: "Delvis ansluten"
+        case .denied: "Nekad"
         case .notDetermined: "Ej ansluten"
-        @unknown default: "Okänd"
         }
     }
 
     private var statusDescription: String {
         switch status {
-        case .sharingAuthorized: "Pass och kroppsvikt synkas"
-        case .sharingDenied: "Ändra i Inställningar → Hälsa"
+        case .authorized: "Pass och kroppsvikt synkas"
+        case .partiallyAuthorized: "Vissa behörigheter saknas"
+        case .denied: "Ändra i Inställningar → Hälsa"
         case .notDetermined: "Synka pass och kroppsvikt"
-        @unknown default: ""
         }
     }
 
     private var buttonText: String {
         switch status {
         case .notDetermined: "ANSLUT"
-        case .sharingDenied: "INSTÄLLNINGAR"
-        case .sharingAuthorized: "INSTÄLLNINGAR"
-        @unknown default: "ANSLUT"
+        default: "INSTÄLLNINGAR"
         }
     }
 

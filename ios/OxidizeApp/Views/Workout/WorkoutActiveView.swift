@@ -109,10 +109,15 @@ struct WorkoutActiveView: View {
         .overlay {
             if vm.showCancelConfirm {
                 CancelWorkoutModal(
+                    hasLoggedSets: vm.exercises.contains { !$0.setsCompleted.isEmpty },
                     onCancel: {
                         vm.showCancelConfirm = false
                     },
-                    onConfirm: {
+                    onSaveAndFinish: {
+                        vm.showCancelConfirm = false
+                        vm.isFinished = true
+                    },
+                    onDiscard: {
                         vm.showCancelConfirm = false
                         vm.cancelWorkout()
                         path.removeLast()
@@ -142,8 +147,10 @@ extension Array {
 }
 
 struct CancelWorkoutModal: View {
+    let hasLoggedSets: Bool
     let onCancel: () -> Void
-    let onConfirm: () -> Void
+    let onSaveAndFinish: () -> Void
+    let onDiscard: () -> Void
 
     var body: some View {
         ZStack {
@@ -152,60 +159,78 @@ struct CancelWorkoutModal: View {
                 .onTapGesture { onCancel() }
 
             VStack(spacing: 0) {
-                // Header
                 VStack(spacing: 8) {
-                    Text("⚠")
-                        .font(.system(size: 32))
-
                     Text("AVSLUTA PASS?")
                         .font(.mono(size: 16, weight: .bold))
-                        .foregroundStyle(Theme.danger)
+                        .foregroundStyle(Theme.fgPrimary)
                         .tracking(2)
                 }
                 .padding(.top, 24)
                 .padding(.bottom, 16)
 
-                // Message
-                Text("Passet sparas inte och alla loggade set försvinner.")
-                    .font(.mono(size: 13))
-                    .foregroundStyle(Theme.fgSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 24)
+                if hasLoggedSets {
+                    Text("Du har loggade set. Vill du spara eller slänga passet?")
+                        .font(.mono(size: 13))
+                        .foregroundStyle(Theme.fgSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24)
+                } else {
+                    Text("Inga set har loggats.")
+                        .font(.mono(size: 13))
+                        .foregroundStyle(Theme.fgSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24)
+                }
 
                 Rectangle()
                     .fill(Theme.border)
                     .frame(height: 1)
 
-                // Buttons
-                HStack(spacing: 0) {
-                    Button {
-                        onCancel()
-                    } label: {
-                        Text("FORTSÄTT")
-                            .font(.mono(size: 13, weight: .bold))
-                            .tracking(1)
-                            .foregroundStyle(Theme.accentA)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                    }
+                // Continue
+                Button {
+                    onCancel()
+                } label: {
+                    Text("FORTSÄTT TRÄNA")
+                        .font(.mono(size: 13, weight: .bold))
+                        .tracking(1)
+                        .foregroundStyle(Theme.accentA)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                }
 
+                if hasLoggedSets {
                     Rectangle()
                         .fill(Theme.border)
-                        .frame(width: 1)
+                        .frame(height: 1)
 
                     Button {
-                        onConfirm()
+                        onSaveAndFinish()
                     } label: {
-                        Text("AVSLUTA")
+                        Text("SPARA & AVSLUTA")
                             .font(.mono(size: 13, weight: .bold))
                             .tracking(1)
-                            .foregroundStyle(Theme.danger)
+                            .foregroundStyle(Theme.fgPrimary)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                     }
                 }
-                .fixedSize(horizontal: false, vertical: true)
+
+                Rectangle()
+                    .fill(Theme.border)
+                    .frame(height: 1)
+
+                Button {
+                    onDiscard()
+                } label: {
+                    Text("SLÄNG PASSET")
+                        .font(.mono(size: 13, weight: .bold))
+                        .tracking(1)
+                        .foregroundStyle(Theme.danger)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                }
             }
             .background(Theme.bgCard)
             .overlay(

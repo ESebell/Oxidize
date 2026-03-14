@@ -41,5 +41,12 @@ struct ContentView: View {
         .task {
             await authVM.checkSession()
         }
+        .onOpenURL { url in
+            Task { await authVM.handleDeepLink(url) }
+        }
+        .sheet(isPresented: $authVM.showResetPasswordView) {
+            ResetPasswordView(authVM: authVM)
+                .interactiveDismissDisabled()
+        }
     }
 }

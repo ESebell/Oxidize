@@ -31,10 +31,34 @@ final class HealthKitService: Sendable {
 
     // MARK: - Status
 
-    /// Returns .notDetermined, .sharingDenied, or .sharingAuthorized for write access
-    func authorizationStatus() -> HKAuthorizationStatus {
+    enum HealthStatus {
+        case notDetermined
+        case authorized
+        case partiallyAuthorized
+        case denied
+    }
+
+    func healthStatus() -> HealthStatus {
         guard isAvailable else { return .notDetermined }
-        return store.authorizationStatus(for: bodyMassType)
+
+        let types: [HKSampleType] = [bodyMassType, activeEnergyType, workoutType]
+        var authorized = 0
+        var denied = 0
+        var undetermined = 0
+
+        for type in types {
+            switch store.authorizationStatus(for: type) {
+            case .sharingAuthorized: authorized += 1
+            case .sharingDenied: denied += 1
+            case .notDetermined: undetermined += 1
+            @unknown default: undetermined += 1
+            }
+        }
+
+        if undetermined == types.count { return .notDetermined }
+        if authorized == types.count { return .authorized }
+        if denied == types.count { return .denied }
+        return .partiallyAuthorized
     }
 
     // MARK: - Bodyweight

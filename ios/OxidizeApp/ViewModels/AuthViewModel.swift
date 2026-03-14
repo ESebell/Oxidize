@@ -89,7 +89,10 @@ final class AuthViewModel {
         errorMessage = nil
 
         do {
-            try await SupabaseService.shared.client.auth.resetPasswordForEmail(email)
+            try await SupabaseService.shared.client.auth.resetPasswordForEmail(
+                email,
+                redirectTo: URL(string: "oxidize://reset-password")
+            )
             resetSent = true
         } catch {
             errorMessage = error.localizedDescription
@@ -98,7 +101,65 @@ final class AuthViewModel {
         isLoading = false
     }
 
+    func handleDeepLink(_ url: URL) async {
+        guard url.scheme == "oxidize", url.host == "reset-password" else { return }
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let session = try await SupabaseService.shared.client.auth.session(from: url)
+            currentSession = AuthSession(
+                accessToken: session.accessToken,
+                refreshToken: session.refreshToken,
+                user: AuthUser(
+                    id: session.user.id.uuidString,
+                    email: session.user.email ?? ""
+                )
+            )
+            StorageService.shared.saveAuthSession(currentSession!)
+            isAuthenticated = true
+            showResetPasswordView = true
+        } catch {
+            errorMessage = "Återställningslänken är ogiltig eller har gått ut"
+        }
+
+        isLoading = false
+    }
+
+    func updatePassword() async {
+        guard !newPassword.isEmpty else {
+            errorMessage = "Ange ett nytt lösenord"
+            return
+        }
+        guard newPassword == confirmNewPassword else {
+            errorMessage = "Lösenorden matchar inte"
+            return
+        }
+        guard newPassword.count >= 6 else {
+            errorMessage = "Lösenordet måste vara minst 6 tecken"
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            try await SupabaseService.shared.client.auth.update(user: .init(password: newPassword))
+            newPassword = ""
+            confirmNewPassword = ""
+            showResetPasswordView = false
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoading = false
+    }
+
     var resetSent = false
+    var showResetPasswordView = false
+    var newPassword = ""
+    var confirmNewPassword = ""
 
     func logout() async {
         await SupabaseService.shared.signOut()
